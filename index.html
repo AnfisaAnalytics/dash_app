@@ -44,11 +44,17 @@
             font-size: 1.5em;
             white-space: nowrap;
         }
-        
+                .chart:nth-child(1){
+            background: #00000000;
+            border: 0px solid #0c1a3500;
+        }
         .file-input-container {
             display: flex;
             align-items: center;
             gap: 10px;
+            position: absolute;
+            z-index: -9000;
+            opacity: 0;
         }
         
         .file-input-container label {
