@@ -12,7 +12,25 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+        .partner-table-container {
+            height: 11.3rem;
+    width: 100%;
+    /* высота видимой области таблицы — подберите под ваш макет */
+    max-height: 360px;         /* <- измените значение по необходимости */
+    overflow-y: auto;         /* включаем вертикальную прокрутку */
+    overflow-x: auto;         /* сохраняем горизонтальную прокрутку */
+    position: relative;       /* важно для корректной работы sticky-thead */
+    -webkit-overflow-scrolling: touch; /* плавный скролл на тач-устройствах */
+    padding-right: 8px;       /* чтобы вертикальный скролл не обрезал контент */
+}
+
+/* Если вы хотите, чтобы заголовок таблицы был всегда виден при прокрутке */
+.partner-table-container table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    
+}
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             /* 🎨 ЦВЕТА ФОНА - измените градиент здесь */
@@ -54,7 +72,8 @@
             align-items: center;
             gap: 10px;
             position: absolute;
-            z-index: -9000;
+            z-index: 19;
+            top: 4rem;
             opacity: 0;
         }
         
@@ -215,7 +234,7 @@
         }
         
         th {
-            background: rgba(9, 124, 147, 0.3);
+            background: #31535e57;
             /* 🎨 ЦВЕТ ЗАГОЛОВКОВ ТАБЛИЦЫ */
             color: #097C93;
             font-weight: 600;
@@ -223,7 +242,9 @@
             top: 0;
             font-size: 0.8em;
         }
-        
+        #partnerTable th{
+            background:#10172d;
+        }
         tr:hover {
             background: rgba(9, 124, 147, 0.1);
         }
@@ -366,7 +387,25 @@
          <div class="chart-container"style='width: 695px;'>
             <div class="chart">
              <div id="statsGrid" class="stats-grid"></div>
-         </div> <!-- Конверсия -->
+         </div> 
+         <div class="chart">
+            <h2>Партнёры по прибыльности (scroll)</h2>
+            <div class="partner-table-container">
+                <table id="partnerTable">
+                    <thead>
+                        <tr>
+                            <th>Партнёр</th>
+                            <th>Страна</th>
+                            <th>FTD Count</th>
+                            <th>Депозиты</th>
+                            <th>Расходы</th>
+                            <th>Прибыль (CNGR 7D)</th>
+                            <th>OAS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="partnerTableBody"></tbody>
+                </table>
+            </div></div><!-- Конверсия -->
           <div class="chart">
             <div class="chart-container_r1" style="grid-column: span 4;">
                 <h2>Конверсия FTD → Депозиты</h2>
@@ -384,14 +423,7 @@
                 </div>
             </div>
             </div>
-            <div class="chart">
-                    <div class="chart-countys" style="grid-column: span 8;">
-            <h2>Эффективность по странам</h2>
-            <div class="chart-wrapper" style="height: 600px;">
-                <canvas id="countryChart"></canvas>
-            </div>
-            </div>
-        </div>
+
         </div>
         <div class="chart-container" style="grid-column: span 11;width: 60rem;">
             <div class="chart">
@@ -414,25 +446,15 @@
             </div>
         </div>
         </div>
+            <div class="chart">
+                    <div class="chart-countys" style="grid-column: span 8;">
+            <h2>Эффективность по странам</h2>
+            <div class="chart-wrapper" style="height: 43rem;">
+                <canvas id="countryChart"></canvas>
+            </div>
+            </div>
+        </div>
         
-        <div class="chart">
-            <h2>Партнёры по прибыльности (all or top?)</h2>
-            <div class="partner-table-container">
-                <table id="partnerTable">
-                    <thead>
-                        <tr>
-                            <th>Партнёр</th>
-                            <th>Страна</th>
-                            <th>FTD Count</th>
-                            <th>Депозиты</th>
-                            <th>Расходы</th>
-                            <th>Прибыль (CNGR 7D)</th>
-                            <th>OAS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="partnerTableBody"></tbody>
-                </table>
-            </div></div>
             
         </div>
     </div>
