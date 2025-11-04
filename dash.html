@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Affiliate Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            /* 🎨 ЦВЕТА ФОНА - измените градиент здесь */
+            background: linear-gradient(135deg, #0C1A35 0%, #474085 100%);
+            color: #ffffff;
+            padding: 15px;
+            min-height: 100vh;
+            padding-top: 15px;
+        }
+        
+        /* Компактный header в одну строку - БЕЗ фиксации */
+        .header {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 20px;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(12, 26, 53, 0.5);
+            border-radius: 8px;
+            width: 100%;
+            /* 🎨 АКЦЕНТНЫЙ ЦВЕТ РАМОК */
+            border: 1px solid rgba(131, 48, 106, 0.3);
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            /* 🎨 ЦВЕТ ЗАГОЛОВКОВ */
+            color: #097C93;
+            font-size: 1.5em;
+            white-space: nowrap;
+        }
+        
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-input-container label {
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+        
+        .file-input-container input[type="file"] {
+            padding: 8px 12px;
+            /* background: #097C93; */
+            color: #ffffff52;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        
+        .filter-container {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .filter-item label {
+            font-size: 0.85em;
+            white-space: nowrap;
+        }
+        
+        .filter-item select {
+            padding: 8px 12px;
+            background: #2D4A83;
+            color: white;
+            border: 1px solid #AC878E;
+            border-radius: 6px;
+            min-width: 150px;
+            font-size: 0.85em;
+        }
+        
+        #resetFilters {
+            padding: 8px 15px;
+            background: #83306A;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85em;
+            white-space: nowrap;
+        }
+        
+        #resetFilters:hover {
+            background: #9c3d7e;
+        }
+        
+        /* KPI фиксированные в правом верхнем углу */
+        .stats-grid {
+            /* position: fixed;
+            top: 15px;
+            right: 15px; */
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1000;
+            max-width: 663px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(9, 124, 147, 0.4), rgba(71, 64, 133, 0.4));
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(131, 48, 106, 0.4);
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.7em;
+            /* 🎨 ЦВЕТ ПОДПИСЕЙ KPI */
+            color: #996C65;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        
+        .stat-card .value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        
+        /* Сетка для визуализаций */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(20, 1fr);
+            gap: 15px;
+            padding-right: 200px; /* Отступ справа для KPI */
+        }
+        
+        .dashboard-grid::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .dashboard-grid::-webkit-scrollbar-track {
+            background: rgba(12, 26, 53, 0.5);
+            border-radius: 4px;
+        }
+        
+        .dashboard-grid::-webkit-scrollbar-thumb {
+            background: #097C93;
+            border-radius: 4px;
+        }
+        .chart {
+            background: rgba(12, 26, 53, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(131, 48, 106, 0.3);
+            margin-bottom: 2rem;
+        }
+        .chart-container {
+            /* background: rgba(12, 26, 53, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(131, 48, 106, 0.3); */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chart-container h2 {
+            /* 🎨 ЦВЕТ ЗАГОЛОВКОВ ГРАФИКОВ */
+            color: #097C93;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+        }
+        
+        /* Таблица партнёров - без прокрутки, компактная */
+        .partner-table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+        
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(131, 48, 106, 0.2);
+            white-space: nowrap;
+        }
+        
+        th {
+            background: rgba(9, 124, 147, 0.3);
+            /* 🎨 ЦВЕТ ЗАГОЛОВКОВ ТАБЛИЦЫ */
+            color: #097C93;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            font-size: 0.8em;
+        }
+        
+        tr:hover {
+            background: rgba(9, 124, 147, 0.1);
+        }
+        
+        /* 🎨 ЦВЕТА ДЛЯ ПОЗИТИВНЫХ/НЕГАТИВНЫХ ЗНАЧЕНИЙ */
+        /* Измените эти цвета, чтобы сделать их менее яркими */
+        .positive {
+            color: #6ec89b; /* Более мягкий зелёный вместо #4ade80 */
+        }
+        
+        .negative {
+            color: #e07b7b; /* Более мягкий красный вместо #f87171 */
+        }
+        
+        /* Canvas для графиков */
+        .chart-wrapper {
+            position: relative;
+            height: 250px;
+            flex: 1;
+        }
+        
+        /* Heatmap */
+        .heatmap-container {
+            overflow-x: auto;
+            max-height: 530px;
+            overflow-y: auto;
+        }
+        
+        .heatmap-cell {
+            padding: 6px;
+            text-align: center;
+            font-size: 0.75em;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            min-width: 50px;
+        }
+        
+        .heatmap-cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 0.8em;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .legend-color {
+            width: 25px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        
+        @media (max-width: 1400px) {
+            .header {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .filter-container {
+                flex-wrap: wrap;
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+.filter-item input[type="date"] {
+    padding: 8px 12px;
+    background: #2D4A83;
+    color: white;
+    border: 1px solid #AC878E;
+    border-radius: 6px;
+    min-width: 150px;
+    font-size: 0.85em;
+    color-scheme: dark;
+}
+
+.filter-item input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+    </style>
+</head>
+<body>
+    <!-- Компактный header в одну строку -->
+    <div class="header">
+        <h1>Affiliate Marketing Dashboard</h1>
+        
+        <div class="file-input-container">
+            <label for="csvFile">csv</label>
+            <input type="file" id="csvFile" accept=".csv">
+        </div>
+        
+        <div class="filter-container" id="filterContainer" style="display: none;">
+            <div class="filter-item">
+                <label for="partnerFilter">Партнёр:</label>
+                <select id="partnerFilter">
+                    <option value="all">Все</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <label for="countryFilter">Страна:</label>
+                <select id="countryFilter">
+                    <option value="all">Все</option>
+                </select>
+            </div>
+            <div class="filter-item">
+    <label for="dateFrom">С даты:</label>
+    <input type="date" id="dateFrom">
+</div>
+<div class="filter-item">
+    <label for="dateTo">По дату:</label>
+    <input type="date" id="dateTo">
+</div>
+        </div>
+        
+        <button id="resetFilters" style="display: none;">Сбросить</button>
+    </div>
+    
+    <!-- Компактный KPI -->
+    
+    
+    <!-- Визуализации в 2 колонки с прокруткой -->
+    <div class="dashboard-grid">
+        <!-- Первая строка: Таблица (55%) + Конверсия (22.5%) + OAS (22.5%) -->
+         <div class="chart-container"style='width: 695px;'>
+            <div class="chart">
+             <div id="statsGrid" class="stats-grid"></div>
+         </div> <!-- Конверсия -->
+          <div class="chart">
+            <div class="chart-container_r1" style="grid-column: span 4;">
+                <h2>Конверсия FTD → Депозиты</h2>
+                <div class="chart-wrapper">
+                    <canvas id="conversionChart"></canvas>
+                </div>
+            </div>
+            </div>
+            <div class="chart">
+            <!-- OAS -->
+            <div class="chart-container_r2" style="grid-column: span 5;">
+                <h2>OAS по временным окнам</h2>
+                <div class="chart-wrapper">
+                    <canvas id="oasChart"></canvas>
+                </div>
+            </div>
+            </div>
+            <div class="chart">
+                    <div class="chart-countys" style="grid-column: span 8;">
+            <h2>Эффективность по странам</h2>
+            <div class="chart-wrapper" style="height: 600px;">
+                <canvas id="countryChart"></canvas>
+            </div>
+            </div>
+        </div>
+        </div>
+        <div class="chart-container" style="grid-column: span 11;width: 60rem;">
+            <div class="chart">
+                    <div class="heatmap" style="grid-column: span 12;">
+            <h2>Heatmap: Партнёры × Страны (по CNGR 7D)</h2>
+            <div class="heatmap-container" id="heatmapContainer"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e07b7b;"></div>
+                    <span>Убытки</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #fbbf24;"></div>
+                    <span>Низкий доход</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #6ec89b;"></div>
+                    <span>Высокий доход</span>
+                </div>
+            </div>
+        </div>
+        </div>
+        
+        <div class="chart">
+            <h2>Партнёры по прибыльности (all or top?)</h2>
+            <div class="partner-table-container">
+                <table id="partnerTable">
+                    <thead>
+                        <tr>
+                            <th>Партнёр</th>
+                            <th>Страна</th>
+                            <th>FTD Count</th>
+                            <th>Депозиты</th>
+                            <th>Расходы</th>
+                            <th>Прибыль (CNGR 7D)</th>
+                            <th>OAS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="partnerTableBody"></tbody>
+                </table>
+            </div></div>
+            
+        </div>
+    </div>
+
+    <script>
+      let rawData = [];
+let allCharts = {};
+let currentFilters = { 
+    partner: 'all', 
+    country: 'all',
+    dateFrom: null,
+    dateTo: null
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 🎨 ПАЛИТРА ЦВЕТОВ ДЛЯ ГРАФИКОВ
+// Измените эти цвета, чтобы изменить цветовую схему всех графиков
+// ═══════════════════════════════════════════════════════════════
+const CHART_COLORS = {
+    primary: '#097C93',      // Основной цвет (бирюзовый) - для основных графиков
+    secondary: '#83306A',    // Вторичный цвет (фиолетовый) - для вторых датасетов
+    tertiary: '#996C65',     // Третичный цвет (розово-коричневый) - для OAS 1D
+    quaternary: '#474085',   // Четвертичный цвет (синий) - для OAS 3D
+    positive: '#6ec89b',     // Цвет для прибыли (мягкий зелёный)
+    negative: '#e07b7b',     // Цвет для убытков (мягкий красный)
+    warning: '#fbbf24'       // Цвет для предупреждений (жёлтый)
+};
+// ═══════════════════════════════════════════════════════════════
+
+// 🎨 ЦВЕТА ДЛЯ HEATMAP
+// Измените эти значения для настройки цветов тепловой карты
+const HEATMAP_COLORS = {
+    negative: 'rgba(224, 123, 123, OPACITY)',  // Красный для убытков
+    positive: 'rgba(110, 200, 155, OPACITY)'   // Зелёный для прибыли
+};
+// ═══════════════════════════════════════════════════════════════
+
+function parseCohortDate(dateStr) {
+    if (!dateStr) return null;
+    // Поддержка разных форматов: YYYY-MM-DD, DD.MM.YYYY, DD/MM/YYYY и т.д.
+    let parsed = null;
+    
+    // Пробуем ISO формат (YYYY-MM-DD)
+    if (dateStr.includes('-')) {
+        parsed = new Date(dateStr);
+    }
+    // Пробуем DD.MM.YYYY
+    else if (dateStr.includes('.')) {
+        const parts = dateStr.split('.');
+        if (parts.length === 3) {
+            parsed = new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+    }
+    // Пробуем DD/MM/YYYY
+    else if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            parsed = new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+    }
+    
+    return parsed && !isNaN(parsed.getTime()) ? parsed : null;
+}
+
+// Автоматическая загрузка файла data.csv при открытии страницы
+// Чтобы использовать: положите файл data.csv в ту же папку, что и HTML
+window.addEventListener('load', function() {
+    fetch('data.csv')
+        .then(response => {
+            if (response.ok) {
+                return response.text();
+            }
+            throw new Error('Файл data.csv не найден');
+        })
+        .then(csvText => {
+            Papa.parse(csvText, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    rawData = results.data.filter(row => 
+                        row['Split 1'] && row['Split 2']
+                    );
+                    initializeFilters();
+                    initializeDateRange();
+                    processData();
+                    document.getElementById('filterContainer').style.display = 'flex';
+                    document.getElementById('resetFilters').style.display = 'block';
+                }
+            });
+        })
+        .catch(error => {
+            console.log('Автозагрузка data.csv не удалась:', error.message);
+        });
+});
+
+document.getElementById('csvFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        Papa.parse(file, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                rawData = results.data.filter(row => 
+                    row['Split 1'] && row['Split 2']
+                );
+                initializeFilters();
+                initializeDateRange();
+                processData();
+                document.getElementById('filterContainer').style.display = 'flex';
+                document.getElementById('resetFilters').style.display = 'block';
+            }
+        });
+    }
+});
+
+document.getElementById('partnerFilter').addEventListener('change', function(e) {
+    currentFilters.partner = e.target.value;
+    processData();
+});
+
+document.getElementById('countryFilter').addEventListener('change', function(e) {
+    currentFilters.country = e.target.value;
+    processData();
+});
+
+document.getElementById('dateFrom').addEventListener('change', function(e) {
+    currentFilters.dateFrom = e.target.value || null;
+    processData();
+});
+
+document.getElementById('dateTo').addEventListener('change', function(e) {
+    currentFilters.dateTo = e.target.value || null;
+    processData();
+});
+
+document.getElementById('resetFilters').addEventListener('click', function() {
+    currentFilters = { partner: 'all', country: 'all', dateFrom: null, dateTo: null };
+    document.getElementById('partnerFilter').value = 'all';
+    document.getElementById('countryFilter').value = 'all';
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    processData();
+});
+
+function initializeFilters() {
+    const partners = [...new Set(rawData.map(row => row['Split 1']))].sort();
+    const countries = [...new Set(rawData.map(row => row['Split 2']))].sort();
+    
+    const partnerSelect = document.getElementById('partnerFilter');
+    partnerSelect.innerHTML = '<option value="all">Все партнёры</option>' +
+        partners.map(p => `<option value="${p}">${p}</option>`).join('');
+    
+    const countrySelect = document.getElementById('countryFilter');
+    countrySelect.innerHTML = '<option value="all">Все страны</option>' +
+        countries.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function initializeDateRange() {
+    const dates = rawData
+        .map(row => parseCohortDate(row['Cohort Date']))
+        .filter(d => d !== null)
+        .sort((a, b) => a - b);
+    
+    if (dates.length > 0) {
+        const minDate = dates[0];
+        const maxDate = dates[dates.length - 1];
+        
+        const dateFromInput = document.getElementById('dateFrom');
+        const dateToInput = document.getElementById('dateTo');
+        
+        // Устанавливаем min/max для input
+        dateFromInput.min = minDate.toISOString().split('T')[0];
+        dateFromInput.max = maxDate.toISOString().split('T')[0];
+        dateToInput.min = minDate.toISOString().split('T')[0];
+        dateToInput.max = maxDate.toISOString().split('T')[0];
+        
+        // Изначально поля пустые (показываем все данные)
+        dateFromInput.value = '';
+        dateToInput.value = '';
+    }
+}
+
+function getFilteredData() {
+    let filtered = rawData;
+    
+    if (currentFilters.partner !== 'all') {
+        filtered = filtered.filter(row => row['Split 1'] === currentFilters.partner);
+    }
+    
+    if (currentFilters.country !== 'all') {
+        filtered = filtered.filter(row => row['Split 2'] === currentFilters.country);
+    }
+    
+    // Фильтрация по датам
+    if (currentFilters.dateFrom || currentFilters.dateTo) {
+        filtered = filtered.filter(row => {
+            const cohortDate = parseCohortDate(row['Cohort Date']);
+            if (!cohortDate) return false;
+            
+            const fromDate = currentFilters.dateFrom ? new Date(currentFilters.dateFrom) : null;
+            const toDate = currentFilters.dateTo ? new Date(currentFilters.dateTo) : null;
+            
+            if (fromDate && cohortDate < fromDate) return false;
+            if (toDate && cohortDate > toDate) return false;
+            
+            return true;
+        });
+    }
+    
+    return filtered;
+}
+
+function processData() {
+    const filteredRawData = getFilteredData();
+    if (filteredRawData.length === 0) {
+        alert('Нет данных для выбранных фильтров');
+        return;
+    }
+    
+    const aggregated = {};
+    
+    filteredRawData.forEach(row => {
+        const partner = row['Split 1'] || 'Unknown';
+        const country = row['Split 2'] || 'Unknown';
+        const key = `${partner}|${country}`;
+        
+        if (!aggregated[key]) {
+            aggregated[key] = {
+                partner,
+                country,
+                ftdCount: 0,
+                depositSum1D: 0,
+                depositSum7D: 0,
+                marketingSpend: 0,
+                cngr7D: 0,
+                depositCount1D: 0,
+                depositCount7D: 0
+            };
+        }
+        
+        aggregated[key].ftdCount += row['First Deposit C'] || 0;
+        aggregated[key].depositSum1D += row['1D Deposit S'] || 0;
+        aggregated[key].depositSum7D += row['7D Deposit S'] || 0;
+        aggregated[key].marketingSpend += row['Marketing Spend'] || 0;
+        aggregated[key].cngr7D += row['7D CNGR'] || 0;
+        aggregated[key].depositCount1D += row['1D Deposit C'] || 0;
+        aggregated[key].depositCount7D += row['7D Deposit C'] || 0;
+    });
+    
+    const dataArray = Object.values(aggregated).filter(d => 
+        d.ftdCount > 0 || d.marketingSpend > 0
+    );
+    
+    displayStats(dataArray);
+    displayPartnerTable(dataArray);
+    displayConversionChart(dataArray);
+    displayOASChart(filteredRawData);
+    displayHeatmap(dataArray);
+    displayCountryChart(dataArray);
+}
+
+function displayStats(data) {
+    const totalSpend = data.reduce((sum, d) => sum + d.marketingSpend, 0);
+    const totalCNGR = data.reduce((sum, d) => sum + d.cngr7D, 0);
+    const totalFTD = data.reduce((sum, d) => sum + d.ftdCount, 0);
+    const totalDeposit7D = data.reduce((sum, d) => sum + d.depositSum7D, 0);
+    const avgOAS = totalSpend > 0 ? (totalCNGR / totalSpend) : 0;
+    
+    const statsHTML = `
+        <div class="stat-card">
+            <h3>Расходы</h3>
+            <div class="value">$${totalSpend.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</div>
+        </div>
+        <div class="stat-card">
+            <h3>CNGR 7D</h3>
+            <div class="value ${totalCNGR >= 0 ? 'positive' : 'negative'}">$${totalCNGR.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</div>
+        </div>
+        <div class="stat-card">
+            <h3>FTD Count</h3>
+            <div class="value">${totalFTD}</div>
+        </div>
+        <div class="stat-card">
+            <h3>Депозиты 7D</h3>
+            <div class="value">$${totalDeposit7D.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</div>
+        </div>
+        <div class="stat-card">
+            <h3>Средний OAS</h3>
+            <div class="value ${avgOAS >= 1 ? 'positive' : 'negative'}">${avgOAS.toFixed(2)}</div>
+        </div>
+    `;
+    
+    document.getElementById('statsGrid').innerHTML = statsHTML;
+}
+
+function displayPartnerTable(data) {
+    // Убрали .slice(0, 20) чтобы показывать всех партнёров, а не только топ-20
+    const sorted = [...data].sort((a, b) => b.cngr7D - a.cngr7D);
+    
+    const tbody = document.getElementById('partnerTableBody');
+    tbody.innerHTML = sorted.map(d => {
+        const oas = d.marketingSpend > 0 ? (d.cngr7D / d.marketingSpend) : 0;
+        return `
+            <tr>
+                <td><strong>${d.partner}</strong></td>
+                <td>${d.country}</td>
+                <td>${d.ftdCount}</td>
+                <td>$${d.depositSum7D.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</td>
+                <td>$${d.marketingSpend.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</td>
+                <td class="${d.cngr7D >= 0 ? 'positive' : 'negative'}">$${d.cngr7D.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</td>
+                <td class="${oas >= 1 ? 'positive' : 'negative'}">${oas.toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function displayConversionChart(data) {
+    const top10 = [...data]
+        .filter(d => d.ftdCount > 0)
+        .sort((a, b) => b.ftdCount - a.ftdCount)
+        .slice(0, 10);
+    
+    const ctx = document.getElementById('conversionChart').getContext('2d');
+    
+    if (allCharts.conversion) {
+        allCharts.conversion.destroy();
+    }
+    
+    allCharts.conversion = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: top10.map(d => d.partner.length > 15 ? d.partner.substring(0, 15) + '...' : d.partner),
+            datasets: [{
+                label: 'FTD Count',
+                data: top10.map(d => d.ftdCount),
+                backgroundColor: CHART_COLORS.primary,
+                borderRadius: 6
+            }, {
+                label: 'Депозиты 7D',
+                data: top10.map(d => d.depositCount7D),
+                backgroundColor: CHART_COLORS.secondary,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#ffffff', font: { size: 11 } }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#ffffff', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                y: { ticks: { color: '#ffffff', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.1)' } }
+            }
+        }
+    });
+}
+
+function displayOASChart(data) {
+    const byDate = {};
+    data.forEach(row => {
+        const date = row['Cohort Date'] || 'N/A';
+        if (!byDate[date]) {
+            byDate[date] = { spend: 0, cngr1D: 0, cngr3D: 0, cngr7D: 0 };
+        }
+        byDate[date].spend += row['Marketing Spend'] || 0;
+        byDate[date].cngr1D += row['1D CNGR'] || 0;
+        byDate[date].cngr3D += row['3D CNGR'] || 0;
+        byDate[date].cngr7D += row['7D CNGR'] || 0;
+    });
+    
+    const dates = Object.keys(byDate).sort().slice(-7);
+    const oas1D = dates.map(d => byDate[d].spend > 0 ? byDate[d].cngr1D / byDate[d].spend : 0);
+    const oas3D = dates.map(d => byDate[d].spend > 0 ? byDate[d].cngr3D / byDate[d].spend : 0);
+    const oas7D = dates.map(d => byDate[d].spend > 0 ? byDate[d].cngr7D / byDate[d].spend : 0);
+    
+    const ctx = document.getElementById('oasChart').getContext('2d');
+    
+    if (allCharts.oas) {
+        allCharts.oas.destroy();
+    }
+    
+    allCharts.oas = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates.map(d => d.substring(5)),
+            datasets: [
+                {
+                    label: 'OAS 1D',
+                    data: oas1D,
+                    borderColor: CHART_COLORS.tertiary,
+                    backgroundColor: `${CHART_COLORS.tertiary}33`,
+                    tension: 0.4
+                },
+                {
+                    label: 'OAS 3D',
+                    data: oas3D,
+                    borderColor: CHART_COLORS.quaternary,
+                    backgroundColor: `${CHART_COLORS.quaternary}33`,
+                    tension: 0.4
+                },
+                {
+                    label: 'OAS 7D',
+                    data: oas7D,
+                    borderColor: CHART_COLORS.primary,
+                    backgroundColor: `${CHART_COLORS.primary}33`,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#ffffff', font: { size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: '#ffffff', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                y: { 
+                    ticks: { color: '#ffffff', font: { size: 10 } }, 
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function displayHeatmap(data) {
+    const topPartners = [...data]
+        .reduce((acc, d) => {
+            acc[d.partner] = (acc[d.partner] || 0) + d.cngr7D;
+            return acc;
+        }, {});
+    const sortedPartners = Object.entries(topPartners)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([p]) => p);
+    
+    const topCountries = [...new Set(data.map(d => d.country))].slice(0, 10);
+    
+    const matrix = {};
+    data.forEach(d => {
+        if (!sortedPartners.includes(d.partner) || !topCountries.includes(d.country)) return;
+        const key = `${d.partner}|${d.country}`;
+        matrix[key] = d.cngr7D;
+    });
+    
+    const values = Object.values(matrix);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    
+    function getColor(value) {
+        if (value < 0) {
+            const intensity = Math.min(Math.abs(value) / Math.abs(min), 1);
+            return HEATMAP_COLORS.negative.replace('OPACITY', 0.3 + intensity * 0.7);
+        } else {
+            const intensity = Math.min(value / max, 1);
+            return HEATMAP_COLORS.positive.replace('OPACITY', 0.3 + intensity * 0.7);
+        }
+    }
+    
+    let html = '<table style="border-collapse: separate; border-spacing: 2px; width: 100%;">';
+    html += '<thead><tr><th style="background: transparent;"></th>';
+    topCountries.forEach(country => {
+        html += `<th style="writing-mode: vertical-rl; transform: rotate(180deg); padding: 10px 5px; font-size: 0.75em;">${country.substring(0, 10)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    sortedPartners.forEach(partner => {
+        html += `<tr><td style="padding: 5px; font-weight: bold; font-size: 0.8em;">${partner.substring(0, 20)}</td>`;
+        topCountries.forEach(country => {
+            const key = `${partner}|${country}`;
+            const value = matrix[key] || 0;
+            const color = getColor(value);
+            html += `<td class="heatmap-cell" style="background: ${color}; min-width: 50px;" title="${partner} - ${country}: ${value.toFixed(0)}">${value !== 0 ? value.toFixed(0) : '-'}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    
+    document.getElementById('heatmapContainer').innerHTML = html;
+}
+
+function displayCountryChart(data) {
+    const byCountry = {};
+    data.forEach(d => {
+        if (!byCountry[d.country]) {
+            byCountry[d.country] = { spend: 0, cngr7D: 0 };
+        }
+        byCountry[d.country].spend += d.marketingSpend;
+        byCountry[d.country].cngr7D += d.cngr7D;
+    });
+    
+    const countries = Object.entries(byCountry)
+        .map(([country, stats]) => ({
+            country,
+            ...stats,
+            roi: stats.spend > 0 ? (stats.cngr7D / stats.spend) : 0
+        }))
+        .sort((a, b) => b.cngr7D - a.cngr7D)
+        .slice(0, 10);
+    
+    const ctx = document.getElementById('countryChart').getContext('2d');
+    
+    if (allCharts.country) {
+        allCharts.country.destroy();
+    }
+    
+    allCharts.country = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: countries.map(c => c.country),
+            datasets: [{
+                label: 'CNGR 7D',
+                data: countries.map(c => c.cngr7D),
+                backgroundColor: countries.map(c => c.cngr7D >= 0 ? CHART_COLORS.positive : CHART_COLORS.negative),
+                borderRadius: 6
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#ffffff', font: { size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: '#ffffff', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                y: { ticks: { color: '#ffffff', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.1)' } }
+            }
+        }
+    });
+}
+    </script>
+</body>
+</html>
