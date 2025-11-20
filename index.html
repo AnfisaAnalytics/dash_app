@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Affiliate Analytics Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Affiliate Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<style>
 :root {
     --bg-primary: #0f1419;
     --bg-secondary: #1a1f2e;
@@ -425,77 +425,54 @@ tbody tr.highlight-row {
 let rawData = [];
 let charts = {};
 let filters = { partner: [], country: [], dateFrom: null, dateTo: null, minFtd: 0 };
-function parseNumber(v) {
+
+function parseNumber(v){
     if (v === null || v === undefined || v === '') return 0;
     if (typeof v === 'number') return v || 0;
-    let s = String(v).replace(/\s/g, '').replace(/\$/g, '').replace(/,/g, '');
+    let s = String(v).replace(/\s/g, '').replace(/\$/g,'').replace(/,/g,'');
     if (s === '') return 0;
     let n = parseFloat(s);
     return isNaN(n) ? 0 : n;
 }
-function parsePercent(v) {
+
+function parsePercent(v){
     if (v === null || v === undefined || v === '') return 0;
     if (typeof v === 'number') {
         return v <= 1 ? v * 100 : v;
     }
     let s = String(v).trim();
-    if (s.endsWith('%')) s = s.slice(0, -1);
-    s = s.replace(/,/g, '.').replace(/\s/g, '');
+    if (s.endsWith('%')) s = s.slice(0,-1);
+    s = s.replace(/,/g, '.').replace(/\s/g,'');
     let n = parseFloat(s);
     return isNaN(n) ? 0 : n;
 }
-function fetchCSV() {
-    fetch('data.csv')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.text();
-        })
-        .then(data => {
-            Papa.parse(data, {
-                header: true,
-                dynamicTyping: false,
-                skipEmptyLines: true,
-                complete: function (results) {
-                    processCSVData(results.data);
-                }
-            });
-        })
-        .catch(() => {
-            // Если загрузка файла не удалась, запрашиваем файл у пользователя
-            document.getElementById('csvFile').addEventListener('change', handleFileSelect);
-            alert('Файл data.csv не найден. Пожалуйста, загрузите CSV файл вручную.');
-        });
-}
-function handleFileSelect(e) {
+
+document.getElementById('csvFile').addEventListener('change', function(e){
     const file = e.target.files[0];
     if (!file) return;
     Papa.parse(file, {
         header: true,
         dynamicTyping: false,
         skipEmptyLines: true,
-        complete: function (results) {
-            processCSVData(results.data);
+        complete: function(results){
+            rawData = results.data.map(r => normalizeRow(r)).filter(r => r['Split 1'] && r['Split 2'] && r['Cohort Date']);
+            if (rawData.length === 0){
+                alert('В файле нет строк с Split 1, Split 2 и Cohort Date');
+                return;
+            }
+            initializeFilters();
+            processData();
+            document.getElementById('filters').style.display = 'flex';
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('noData').style.display = 'none';
         }
     });
-}
-function processCSVData(data) {
-    rawData = data.map(row => normalizeRow(row)).filter(row => row['Split 1'] && row['Split 2'] && row['Cohort Date']);
-    
-    if (rawData.length === 0) {
-        alert('В файле нет строк с Split 1, Split 2 и Cohort Date');
-        return;
-    }
-    initializeFilters();
-    processData();
-    document.getElementById('filters').style.display = 'flex';
-    document.getElementById('content').style.display = 'block';
-    document.getElementById('noData').style.display = 'none';
-}
-function normalizeRow(r) {
+});
+
+function normalizeRow(r){
     const copy = {};
-    for (let k in r) { copy[k.trim()] = r[k]; }
+    for (let k in r){ copy[k.trim()] = r[k]; }
+    
     copy['First Deposit C'] = parseNumber(copy['First Deposit C'] ?? copy['FTD'] ?? copy['FirstDepositC']);
     copy['Marketing Spend'] = parseNumber(copy['Marketing Spend'] ?? copy['Cost'] ?? copy['MarketingSpend']);
     copy['1D CNGR'] = parseNumber(copy['1D CNGR'] ?? copy['1D_Cngr']);
@@ -511,41 +488,50 @@ function normalizeRow(r) {
     copy['Cohort Date'] = normalizeDate(copy['Cohort Date']);
     copy['Split 1'] = (copy['Split 1'] || '').toString();
     copy['Split 2'] = (copy['Split 2'] || '').toString();
+    
     return copy;
 }
-function normalizeDate(v) {
+
+function normalizeDate(v){
     if (!v) return null;
     if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.split('T')[0];
     const d = new Date(v);
     if (isNaN(d)) return v;
     const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
     return `${yyyy}-${mm}-${dd}`;
 }
-function initializeFilters() {
+
+function initializeFilters(){
     const partners = [...new Set(rawData.map(r => r['Split 1']))].sort();
     const countries = [...new Set(rawData.map(r => r['Split 2']))].sort();
+
     const psel = document.getElementById('partnerFilter');
     psel.innerHTML = '<option value="__all__">Все</option>' +
         partners.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+
     const csel = document.getElementById('countryFilter');
     csel.innerHTML = '<option value="__all__">Все</option>' +
         countries.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
     document.getElementById('partnerFilter').addEventListener('change', applyFilters);
     document.getElementById('countryFilter').addEventListener('change', applyFilters);
     document.getElementById('dateFrom').addEventListener('change', applyFilters);
     document.getElementById('dateTo').addEventListener('change', applyFilters);
     document.getElementById('minFtd').addEventListener('change', applyFilters);
+
     populateCompareSelects();
 }
-function getSelectedValues(selectEl) {
+
+function getSelectedValues(selectEl){
     if (!selectEl) return [];
     const selected = Array.from(selectEl.options).filter(o => o.selected).map(o => o.value);
     if (selected.includes('__all__')) return [];
     return selected;
 }
-function applyFilters() {
+
+function applyFilters(){
     filters.partner = getSelectedValues(document.getElementById('partnerFilter'));
     filters.country = getSelectedValues(document.getElementById('countryFilter'));
     filters.dateFrom = document.getElementById('dateFrom').value || null;
@@ -553,11 +539,18 @@ function applyFilters() {
     filters.minFtd = parseInt(document.getElementById('minFtd').value || 0, 10);
     processData();
 }
-function processData() {
-    const data = getFilteredData();
-    // Ваша логика для обработки данных
+
+function resetFilters(){
+    filters = { partner: [], country: [], dateFrom: null, dateTo: null, minFtd: 0 };
+    Array.from(document.getElementById('partnerFilter').options).forEach(o => o.selected = false);
+    Array.from(document.getElementById('countryFilter').options).forEach(o => o.selected = false);
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    document.getElementById('minFtd').value = '';
+    processData();
 }
-function getFilteredData() {
+
+function getFilteredData(){
     return rawData.filter(r => {
         if (filters.partner.length && !filters.partner.includes(r['Split 1'])) return false;
         if (filters.country.length && !filters.country.includes(r['Split 2'])) return false;
@@ -567,21 +560,528 @@ function getFilteredData() {
         return true;
     });
 }
-function populateCompareSelects() {
-    const partners = [...new Set(rawData.map(r => r['Split 1']))].sort();
+
+/*
+  processData: теперь собирает:
+  - пер-партнёрные агрегаты для списка контрибьюторов FD→2Dep:
+    partnerAgg[partner] = { fd2WeightedNum, fd2WeightedDen, fd2SimpleSum, fd2Count, ftdSum, cohorts: [...] }
+  - по-прежнему считает агрегацию partner|country для таблицы
+*/
+function processData(){
+    const data = getFilteredData();
+
+    const aggregated = {};
+    const partnerAgg = {}; // новый уровень агрегирования по партнёру
+    let overall = { cost:0, ftd:0, cngr28:0, fd2sum:0, fd2count:0, fd2weightedNum:0, fd2weightedDen:0, avgCheckSum:0, avgCheckCount:0, depCount:0, depSum:0, crashSum:0, crashCount:0 };
+
+    data.forEach(row => {
+        const key = `${row['Split 1']}|${row['Split 2']}`;
+        if (!aggregated[key]) aggregated[key] = {
+            partner: row['Split 1'],
+            country: row['Split 2'],
+            rows: [],
+            ftd:0, cost:0, cngr1:0, cngr7:0, cngr14:0, cngr28:0,
+            deposit1d:0, deposit7d:0, depositCount7d:0,
+            fd2depSum:0, fd2depCount:0, avgCheckSum:0, avgCheckCount:0,
+            crashSum:0, crashCount:0
+        };
+        aggregated[key].rows.push(row);
+
+        aggregated[key].ftd += parseNumber(row['First Deposit C']);
+        aggregated[key].cost += parseNumber(row['Marketing Spend']);
+        aggregated[key].cngr1 += parseNumber(row['1D CNGR']);
+        aggregated[key].cngr7 += parseNumber(row['7D CNGR']);
+        aggregated[key].cngr14 += parseNumber(row['14D CNGR']);
+        aggregated[key].cngr28 += parseNumber(row['28D CNGR']);
+        aggregated[key].deposit1d += parseNumber(row['1D Deposit S']);
+        aggregated[key].deposit7d += parseNumber(row['7D Deposit S']);
+        aggregated[key].depositCount7d += parseNumber(row['7D Deposit C']);
+
+        const fdConv = parsePercent(row['First Deposit 2 Deposit Conversion']);
+        const ftd = parseNumber(row['First Deposit C']);
+
+        if (fdConv > 0){ 
+            aggregated[key].fd2depSum += fdConv; 
+            aggregated[key].fd2depCount++; 
+        }
+
+        // накопление по партнёру (новое)
+        const p = row['Split 1'];
+        if (!partnerAgg[p]) partnerAgg[p] = { fd2WeightedNum:0, fd2WeightedDen:0, fd2SimpleSum:0, fd2Count:0, ftdSum:0, cohorts: [] };
+        if (fdConv > 0){
+            partnerAgg[p].fd2WeightedNum += fdConv * ftd;
+            partnerAgg[p].fd2WeightedDen += ftd;
+            partnerAgg[p].fd2SimpleSum += fdConv;
+            partnerAgg[p].fd2Count++;
+            partnerAgg[p].cohorts.push({ date: row['Cohort Date'] || '—', fdConv: fdConv, ftd: ftd, country: row['Split 2'] || '' });
+        }
+        partnerAgg[p].ftdSum += ftd;
+
+        const avgc = parseNumber(row['Avg Check']);
+        if (avgc > 0){ aggregated[key].avgCheckSum += avgc; aggregated[key].avgCheckCount++; }
+
+        const crash = parsePercent(row['Crash FTD']);
+        if (crash > 0){ aggregated[key].crashSum += crash; aggregated[key].crashCount++; }
+
+        overall.cost += parseNumber(row['Marketing Spend']);
+        overall.ftd += ftd;
+        overall.cngr28 += parseNumber(row['28D CNGR']);
+        overall.depCount += parseNumber(row['7D Deposit C']);
+        overall.depSum += parseNumber(row['7D Deposit S']);
+        if (fdConv > 0){ 
+            overall.fd2sum += fdConv; 
+            overall.fd2count++; 
+            overall.fd2weightedNum += fdConv * ftd;
+            overall.fd2weightedDen += ftd;
+        }
+        if (avgc > 0){ overall.avgCheckSum += avgc; overall.avgCheckCount++; }
+        if (crash > 0){ overall.crashSum += crash; overall.crashCount++; }
+    });
+
+    const processed = Object.values(aggregated).map(d => {
+        const cpa = d.ftd > 0 ? d.cost / d.ftd : 0;
+        const avgOas28 = d.cost > 0 ? d.cngr28 / d.cost : 0;
+        const profit28 = d.cngr28 - d.cost;
+        const fd2conv = d.fd2depCount > 0 ? (d.fd2depSum / d.fd2depCount) : 0;
+        const avgCheck = d.avgCheckCount > 0 ? d.avgCheckSum / d.avgCheckCount : 0;
+        const avgCrash = d.crashCount > 0 ? d.crashSum / d.crashCount : 0;
+        const depSum = d.deposit7d;
+
+        const isGood = (avgOas28 >= 0.8) && (profit28 > 0) && (fd2conv >= 20) && (cpa < 250);
+        const isProblem = (avgOas28 < 0.5) || (fd2conv < 20) || (profit28 < -1000);
+
+        return {...d, cpa, avgOas28, profit28, fd2conv, avgCheck, depSum, avgCrash, isGood, isProblem};
+    });
+
+    processed.sort((a, b) => b.ftd - a.ftd);
+
+    const totalCost = overall.cost;
+    const totalFTD = overall.ftd;
+    const totalCNGR28 = overall.cngr28;
+    const totalProfit28 = totalCNGR28 - totalCost;
+    const overallOas = totalCost > 0 ? totalCNGR28 / totalCost : 0;
+    const overallCpa = totalFTD > 0 ? totalCost / totalFTD : 0;
+    const overallFd2Weighted = overall.fd2weightedDen > 0 ? (overall.fd2weightedNum / overall.fd2weightedDen) : (overall.fd2count > 0 ? (overall.fd2sum / overall.fd2count) : 0);
+    const overallAvgCheck = overall.avgCheckCount > 0 ? overall.avgCheckSum / overall.avgCheckCount : 0;
+    const overallDepCount = overall.depCount;
+    const overallDepSum = overall.depSum;
+    const overallCrash = overall.crashCount > 0 ? overall.crashSum / overall.crashCount : 0;
+
+    // build partner contributors array с ключевыми значениями и топ‑когортами
+    const fd2Partners = Object.keys(partnerAgg).map(p => {
+        const pa = partnerAgg[p];
+        const weighted = pa.fd2WeightedDen > 0 ? (pa.fd2WeightedNum / pa.fd2WeightedDen) : (pa.fd2Count > 0 ? (pa.fd2SimpleSum / pa.fd2Count) : 0);
+        const simple = pa.fd2Count > 0 ? (pa.fd2SimpleSum / pa.fd2Count) : 0;
+        // top cohorts by FTD
+        const topCohorts = pa.cohorts.slice().sort((a,b)=>b.ftd - a.ftd).slice(0,5);
+        return { partner: p, weighted: weighted, simple: simple, ftdSum: pa.ftdSum, cohortsCount: pa.fd2Count, topCohorts };
+    }).filter(x => x.cohortsCount > 0).sort((a,b)=>b.ftdSum - a.ftdSum);
+
+    displayMetrics({ totalCost, totalFTD, overallCpa, totalCNGR28, totalProfit28, overallOas, overallFd2Weighted, overallAvgCheck, overallDepCount, overallDepSum, overallCrash, fd2Partners });
+    displayCharts(data, processed);
+    displayTable(processed);
+    displayProblemLists(processed);
+    populateCompareSelects();
+}
+
+function displayMetrics(vals){
+    const metrics = [
+        { label: 'Cost', value: `${Math.round(vals.totalCost).toLocaleString('en-US')}`, change:null },
+        { label: 'FTD', value: `${Math.round(vals.totalFTD).toLocaleString('en-US')}`, change:null },
+        { label: 'CPA', value: `${(vals.overallCpa||0).toFixed(1)}`, change: (vals.overallCpa||0) < 200 ? 'positive' : (vals.overallCpa||0) < 300 ? null : 'negative' },
+        { label: 'Avg Check', value: `${(vals.overallAvgCheck||0).toFixed(1)}`, change: (vals.overallAvgCheck||0) > 250 ? 'positive' : (vals.overallAvgCheck||0) > 150 ? null : 'negative' },
+        { label: 'Dep Count', value: `${Math.round(vals.overallDepCount||0)}`, change:null },
+        { label: 'FD→2Dep %', value: `${(vals.overallFd2Weighted||0).toFixed(1)}%`, change: (vals.overallFd2Weighted||0) >= 20 ? 'positive' : 'negative' },
+        { label: 'Dep Summ', value: `${Math.round(vals.overallDepSum||0).toLocaleString('en-US')}`, change:null },
+        { label: 'CNGR 28D', value: `${Math.round(vals.totalCNGR28||0).toLocaleString('en-US')}`, change: (vals.totalCNGR28||0) > 0 ? 'positive' : 'negative' },
+        { label: 'Profit 28D', value: `${Math.round(vals.totalProfit28||0).toLocaleString('en-US')}`, change:(vals.totalProfit28||0) > 0 ? 'positive' : 'negative'},
+        { label: 'OAS 28D', value: (vals.overallOas||0).toFixed(2), change:(vals.overallOas||0) >= 0.8 ? 'positive' : (vals.overallOas||0) >= 0.5 ? 'warning' : 'negative' },
+        { label: 'Crash FTD %', value: `${(vals.overallCrash||0).toFixed(1)}%`, change: (vals.overallCrash||0) < 25 ? 'positive' : (vals.overallCrash||0) < 35 ? 'warning' : 'negative' }
+    ];
+    const html = metrics.map(m => `
+        <div class="metric-card">
+            <div class="metric-label">${m.label}</div>
+            <div class="metric-value ${m.change||''}">${m.value}</div>
+        </div>
+    `).join('');
+    document.getElementById('metricsGrid').innerHTML = html;
+
+    // FD→2Dep breakdown: показываем взвешенное значение и расширенный список партнёров с ключевыми данными
+    const weighted = (vals.overallFd2Weighted||0).toFixed(1);
+    const partners = vals.fd2Partners || [];
+    const breakdown = `FD→2Dep (взвешенное по FTD): ${weighted}% — вычислено на основе данных по ${partners.length} партнёрам.`;
+    document.getElementById('fd2Breakdown').textContent = breakdown;
+
+    // render contributors table with key values and expandable per-partner cohorts
+    if (!partners.length){
+        document.getElementById('fd2Contributors').innerHTML = '<div style="color:var(--text-muted)">Нет данных по FD→2Dep в отфильтрованных строках</div>';
+        return;
+    }
+    const rows = partners.map(p=>{
+        const id = makeId(p.partner);
+        const weightedStr = p.weighted.toFixed(1) + '%';
+        const simpleStr = p.simple.toFixed(1) + '%';
+        const cohortsCount = p.cohortsCount;
+        const ftdSum = Math.round(p.ftdSum);
+        const cohortsPreview = p.topCohorts.map(c=>`${escapeHtml(c.date)} (${escapeHtml(c.country)}): ${c.fdConv.toFixed(1)}% | FTD ${Math.round(c.ftd)}`).join('; ');
+        return `<tr>
+            <td><strong>${escapeHtml(p.partner)}</strong></td>
+            <td>${weightedStr}</td>
+            <td>${simpleStr}</td>
+            <td>${ftdSum}</td>
+            <td>${cohortsCount}</td>
+            <td><button class="toggle-btn" onclick="togglePartnerDetails('${id}')">Показать детали</button></td>
+        </tr>
+        <tr id="details-${id}" style="display:none;">
+            <td colspan="6" class="small-cohort-list">
+                ${escapeHtml(cohortsPreview)}
+            </td>
+        </tr>`;
+    }).join('');
+
+    const tableHtml = `<table class="fd-contrib-table">
+        <thead><tr><th>Партнёр</th><th>FD→2Dep (взв.)</th><th>FD→2Dep (прост.)</th><th>Суммарный FTD</th><th>Когорт(ы) в расчёте</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+    document.getElementById('fd2Contributors').innerHTML = tableHtml;
+}
+
+// toggler для показа/скрытия детализации партнёра
+function togglePartnerDetails(id){
+    const el = document.getElementById('details-'+id);
+    if (!el) return;
+    el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
+}
+
+// helper: нормализуем строку в id
+function makeId(s){
+    return String(s || '').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+}
+
+function displayCharts(rawData, aggregated){
+    // оставляем графики как есть (CNGR, OAS, Profit)
+    const cngrCtx = document.getElementById('cngrChart').getContext('2d');
+    if (charts.cngr) charts.cngr.destroy();
+    const top10 = aggregated.slice().sort((a,b)=>b.cngr28 - a.cngr28).slice(0,10);
+    charts.cngr = new Chart(cngrCtx, {
+        type:'bar',
+        data:{ labels: top10.map(d=>truncate(d.partner,18)),
+            datasets:[{ label: 'CNGR 28D', data: top10.map(d=>d.cngr28),
+                backgroundColor: top10.map(d => d.cngr28 < 0 ? 'rgba(245,101,101,0.9)' : 'rgba(72,187,120,0.9)') }]
+        },
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#a0aec0'}},y:{ticks:{color:'#a0aec0'}}}}
+    });
+
+    const oasCtx = document.getElementById('oasChart').getContext('2d');
+    if (charts.oas) charts.oas.destroy();
+    const byDate = {};
+    rawData.forEach(r => {
+        const d = r['Cohort Date'] || 'unknown';
+        if (!byDate[d]) byDate[d] = { cost:0, cngr1:0, cngr7:0, cngr14:0, cngr28:0 };
+        byDate[d].cost += parseNumber(r['Marketing Spend']);
+        byDate[d].cngr1 += parseNumber(r['1D CNGR']);
+        byDate[d].cngr7 += parseNumber(r['7D CNGR']);
+        byDate[d].cngr14 += parseNumber(r['14D CNGR']);
+        byDate[d].cngr28 += parseNumber(r['28D CNGR']);
+    });
+    const dates = Object.keys(byDate).sort().slice(-14);
+    charts.oas = new Chart(oasCtx, {
+        type:'line',
+        data:{ labels: dates,
+            datasets:[
+                {label:'OAS 1D', data: dates.map(d=>byDate[d].cost>0 ? byDate[d].cngr1/byDate[d].cost : 0), borderColor:'rgba(245,101,101,1)', backgroundColor:'rgba(245,101,101,0.08)', tension:0.3},
+                {label:'OAS 7D', data: dates.map(d=>byDate[d].cost>0 ? byDate[d].cngr7/byDate[d].cost : 0), borderColor:'rgba(236,201,75,1)', backgroundColor:'rgba(236,201,75,0.06)', tension:0.3},
+                {label:'OAS 14D', data: dates.map(d=>byDate[d].cost>0 ? byDate[d].cngr14/byDate[d].cost : 0), borderColor:'rgba(102,126,234,1)', backgroundColor:'rgba(102,126,234,0.06)', tension:0.3},
+                {label:'OAS 28D', data: dates.map(d=>byDate[d].cost>0 ? byDate[d].cngr28/byDate[d].cost : 0), borderColor:'rgba(72,187,120,1)', backgroundColor:'rgba(72,187,120,0.06)', tension:0.3}
+            ]
+        },
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#e6eef6'}}},scales:{x:{ticks:{color:'#a0aec0'}},y:{ticks:{color:'#a0aec0'}}}}
+    });
+
+    const profitCtx = document.getElementById('profitChart').getContext('2d');
+    if (charts.profit) charts.profit.destroy();
+    const topProfit = aggregated.slice().sort((a,b)=> (b.cngr28 - b.cost) - (a.cngr28 - a.cost)).slice(0,10);
+    charts.profit = new Chart(profitCtx, {
+        type:'bar',
+        data:{ labels: topProfit.map(d=>truncate(d.partner,18)),
+               datasets:[
+                   {label:'Cost (neg)', data: topProfit.map(d=>-d.cost), backgroundColor:'rgba(245,101,101,0.85)'},
+                   {label:'CNGR 28D', data: topProfit.map(d=>d.cngr28), backgroundColor:'rgba(72,187,120,0.85)'}
+               ]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#e6eef6'}}},scales:{x:{ticks:{color:'#a0aec0'}},y:{ticks:{color:'#a0aec0'}}}}
+    });
+}
+
+function displayTable(data){
+    const tbody = document.getElementById('detailsTableBody');
+    tbody.innerHTML = data.map(d => {
+        const oasClass = d.avgOas28 >= 0.8 ? 'positive' : d.avgOas28 >= 0.5 ? 'warning' : 'negative';
+        const fdClass = d.fd2conv >= 20 ? 'positive' : 'negative';
+        const profitClass = d.profit28 > 0 ? 'positive' : 'negative';
+        const cpaClass = d.cpa < 200 ? 'positive' : d.cpa < 300 ? '' : 'negative';
+        const avgCheckClass = d.avgCheck > 250 ? 'positive' : d.avgCheck > 150 ? '' : 'negative';
+        const crashClass = d.avgCrash < 25 ? 'positive' : d.avgCrash < 35 ? 'warning' : 'negative';
+        const statusClass = d.isGood ? 'status-good' : 'status-bad';
+        
+        return `<tr data-key="${escapeHtml(d.partner)}|${escapeHtml(d.country)}" onclick="showRowDetails(event)">
+            <td><strong>${escapeHtml(d.partner)}</strong></td>
+            <td>${escapeHtml(d.country)}</td>
+            <td>${escapeHtml(d.rows.map(r=>r['Cohort Date']).filter(Boolean).slice(0,1)[0] || '')}</td>
+            <td>${Math.round(d.cost).toLocaleString('en-US')}</td>
+            <td>${Math.round(d.ftd)}</td>
+            <td class="${cpaClass}">${(d.cpa||0).toFixed(1)}</td>
+            <td class="${avgCheckClass}">${(d.avgCheck||0).toFixed(1)}</td>
+            <td>${Math.round(d.depositCount7d||0)}</td>
+            <td class="${fdClass}">${(d.fd2conv||0).toFixed(1)}%</td>
+            <td>${Math.round(d.depSum||0).toLocaleString('en-US')}</td>
+            <td>${Math.round(d.cngr28).toLocaleString('en-US')}</td>
+            <td class="${profitClass}">${Math.round(d.profit28).toLocaleString('en-US')}</td>
+            <td class="${oasClass}">${(d.avgOas28||0).toFixed(2)}</td>
+            <td class="${crashClass}">${(d.avgCrash||0).toFixed(1)}%</td>
+            <td><span class="status-badge ${statusClass}">${d.isGood ? 'ХОРОШО' : 'ПЛОХО'}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function showRowDetails(e){
+    const tr = e.currentTarget;
+    const key = tr.getAttribute('data-key');
+    const [partner,country] = key.split('|');
+    const filtered = getFilteredData();
+    const rows = filtered.filter(r => r['Split 1']===partner && r['Split 2']===country);
+    if (rows.length === 0) return;
+    
+    const dist = {};
+    rows.forEach(r => {
+        const d = r['Cohort Date'] || '—';
+        if (!dist[d]) dist[d] = {ftd:0, fd2:[], cost:0, avgCheck:[], crash:[], rawRows:[]};
+        dist[d].ftd += parseNumber(r['First Deposit C']);
+        dist[d].cost += parseNumber(r['Marketing Spend']);
+        dist[d].fd2.push(parsePercent(r['First Deposit 2 Deposit Conversion']));
+        const ac = parseNumber(r['Avg Check']);
+        if (ac > 0) dist[d].avgCheck.push(ac);
+        const cr = parsePercent(r['Crash FTD']);
+        if (cr > 0) dist[d].crash.push(cr);
+        dist[d].rawRows.push(r);
+    });
+    
+    const rowsHtml = Object.keys(dist).sort().map(date=>{
+        const entry = dist[date];
+        const avgFd2 = entry.fd2.length ? (entry.fd2.reduce((a,b)=>a+b,0)/entry.fd2.length) : 0;
+        const avgCheck = entry.avgCheck.length ? (entry.avgCheck.reduce((a,b)=>a+b,0)/entry.avgCheck.length) : 0;
+        const avgCrash = entry.crash.length ? (entry.crash.reduce((a,b)=>a+b,0)/entry.crash.length) : 0;
+        const fdClass = avgFd2 >= 20 ? 'positive' : 'negative';
+        const checkClass = avgCheck > 250 ? 'positive' : avgCheck > 150 ? '' : 'negative';
+        const crashClass = avgCrash < 25 ? 'positive' : avgCrash < 35 ? 'warning' : 'negative';
+        
+        return `<tr>
+            <td>${escapeHtml(date)}</td>
+            <td>${Math.round(entry.ftd)}</td>
+            <td>${Math.round(entry.cost)}</td>
+            <td class="${fdClass}">${avgFd2.toFixed(1)}%</td>
+            <td class="${checkClass}">${avgCheck.toFixed(1)}</td>
+            <td class="${crashClass}">${avgCrash.toFixed(1)}%</td>
+        </tr>`;
+    }).join('');
+    
+    const container = document.getElementById('rowDetails');
+    container.style.display = 'block';
+    container.innerHTML = `<strong>Детали: ${escapeHtml(partner)} — ${escapeHtml(country)}</strong>
+        <div style="margin-top:8px;font-size:13px;color:var(--muted)">Разбивка по датам когорт</div>
+        <table style="width:100%;margin-top:8px;color:var(--muted)">
+            <thead><tr><th>Когорта</th><th>FTD</th><th>Cost</th><th>FD→2Dep %</th><th>Avg Check</th><th>Crash FTD %</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+        </table>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="btn" onclick="closeRowDetails()">Закрыть</button>
+        </div>
+    `;
+    
+    Array.from(document.querySelectorAll('#detailsTableBody tr')).forEach(r=>r.classList.remove('highlight-row'));
+    tr.classList.add('highlight-row');
+}
+
+function closeRowDetails(){
+    document.getElementById('rowDetails').style.display = 'none';
+    Array.from(document.querySelectorAll('#detailsTableBody tr')).forEach(r=>r.classList.remove('highlight-row'));
+}
+
+function displayProblemLists(processed){
+    const problems = processed.filter(p => p.isProblem).sort((a,b)=>a.avgOas28 - b.avgOas28).slice(0,10);
+    const problemHtml = problems.length ? problems.map(p => {
+        const reasons = [];
+        if (p.avgOas28 < 0.5) reasons.push(`низкий OAS ${p.avgOas28.toFixed(2)}`);
+        if (p.fd2conv < 20) reasons.push(`низкая FD→2Dep ${p.fd2conv.toFixed(1)}%`);
+        if (p.profit28 < -1000) reasons.push(`убыток ${Math.round(p.profit28)}`);
+        if (p.cpa > 300) reasons.push(`высокий CPA ${p.cpa.toFixed(1)}`);
+        
+        return `<div class="problem-item">
+            <strong>${escapeHtml(p.partner)}</strong> / ${escapeHtml(p.country)}<br>
+            <span style="color:var(--text-muted);font-size:12px">
+                Проблемы: ${reasons.join(', ')}<br>
+                FTD: ${Math.round(p.ftd)} | Cost: ${Math.round(p.cost)} | Profit: ${Math.round(p.profit28)}
+            </span>
+        </div>`;
+    }).join('') : '<div style="color:var(--text-muted)">Нет проблемных когорт</div>';
+    document.getElementById('problemList').innerHTML = problemHtml;
+
+    const good = processed.filter(p => p.isGood).sort((a,b)=>b.profit28 - a.profit28).slice(0,10);
+    const goodHtml = good.length ? good.map(p => `<div class="problem-item good">
+            <strong>${escapeHtml(p.partner)}</strong> / ${escapeHtml(p.country)}<br>
+            <span style="color:var(--text-muted);font-size:12px">
+                OAS: ${p.avgOas28.toFixed(2)} | FD→2Dep: ${p.fd2conv.toFixed(1)}% | CPA: ${p.cpa.toFixed(1)}<br>
+                Profit: ${Math.round(p.profit28)} | Avg Check: ${p.avgCheck.toFixed(1)}
+            </span>
+        </div>`).join('') : '<div style="color:var(--text-muted)">Пока нет успешных когорт</div>';
+    document.getElementById('goodList').innerHTML = goodHtml;
+}
+
+function populateCompareSelects(){
+    const partners = [...new Set(rawData.map(r=>r['Split 1']))].sort();
     const compareA = document.getElementById('compareA');
     const compareB = document.getElementById('compareB');
     if (!compareA || !compareB) return;
+    
+    const selA = compareA.value;
+    const selB = compareB.value;
+    
     compareA.innerHTML = '<option value="">—</option>' + partners.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
     compareB.innerHTML = '<option value="">—</option>' + partners.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-}
-function escapeHtml(s) {
-    if (s === null || s === undefined) return '';
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-// Вызываем загрузку CSV при старте страницы
-fetchCSV();
     
+    if (partners.includes(selA)) compareA.value = selA;
+    if (partners.includes(selB)) compareB.value = selB;
+}
+
+function compareSelected(){
+    const a = document.getElementById('compareA').value;
+    const b = document.getElementById('compareB').value;
+    
+    if (!a || !b || a===b) {
+        document.getElementById('compareResult').innerHTML = '<span style="color:var(--text-muted)">Выберите два разных партнёра</span>';
+        return;
+    }
+    
+    const filtered = getFilteredData();
+    const aggr = {};
+    
+    filtered.forEach(r => {
+        const key = r['Split 1'];
+        if (!aggr[key]) aggr[key] = {ftd:0,cost:0,cngr28:0,fd2sum:0,fd2count:0,avgCheckSum:0,avgCheckCount:0,depCount:0,depSum:0,crashSum:0,crashCount:0};
+        aggr[key].ftd += parseNumber(r['First Deposit C']);
+        aggr[key].cost += parseNumber(r['Marketing Spend']);
+        aggr[key].cngr28 += parseNumber(r['28D CNGR']);
+        aggr[key].depCount += parseNumber(r['7D Deposit C']);
+        aggr[key].depSum += parseNumber(r['7D Deposit S']);
+        
+        const fd2 = parsePercent(r['First Deposit 2 Deposit Conversion']);
+        if (fd2>0){ aggr[key].fd2sum += fd2; aggr[key].fd2count++; }
+        
+        const ac = parseNumber(r['Avg Check']);
+        if (ac>0){ aggr[key].avgCheckSum += ac; aggr[key].avgCheckCount++; }
+        
+        const crash = parsePercent(r['Crash FTD']);
+        if (crash>0){ aggr[key].crashSum += crash; aggr[key].crashCount++; }
+    });
+    
+    const A = aggr[a] || {ftd:0,cost:0,cngr28:0,fd2sum:0,fd2count:0,avgCheckSum:0,avgCheckCount:0,depCount:0,depSum:0,crashSum:0,crashCount:0};
+    const B = aggr[b] || {ftd:0,cost:0,cngr28:0,fd2sum:0,fd2count:0,avgCheckSum:0,avgCheckCount:0,depCount:0,depSum:0,crashSum:0,crashCount:0};
+    
+    const cpaA = A.ftd ? (A.cost/A.ftd) : 0;
+    const cpaB = B.ftd ? (B.cost/B.ftd) : 0;
+    const oasA = A.cost ? (A.cngr28/A.cost) : 0;
+    const oasB = B.cost ? (B.cngr28/B.cost) : 0;
+    const profitA = A.cngr28 - A.cost;
+    const profitB = B.cngr28 - B.cost;
+    const fd2A = A.fd2count ? (A.fd2sum/A.fd2count) : 0;
+    const fd2B = B.fd2count ? (B.fd2sum/B.fd2count) : 0;
+    const avgCheckA = A.avgCheckCount ? (A.avgCheckSum/A.avgCheckCount) : 0;
+    const avgCheckB = B.avgCheckCount ? (B.avgCheckSum/B.avgCheckCount) : 0;
+    const crashA = A.crashCount ? (A.crashSum/A.crashCount) : 0;
+    const crashB = B.crashCount ? (B.crashSum/B.crashCount) : 0;
+    
+    const summary = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+            <div style="background:var(--bg-tertiary);padding:12px;border-radius:6px;">
+                <strong style="color:var(--accent);">${escapeHtml(a)}</strong>
+                <div style="margin-top:8px;font-size:12px;color:var(--text-muted);line-height:1.6">
+                    Cost: <span class="metric-value">${Math.round(A.cost)}</span><br>
+                    FTD: <span class="metric-value">${Math.round(A.ftd)}</span><br>
+                    CPA: <span class="metric-value ${cpaA<200?'positive':cpaA<300?'':'negative'}">${cpaA.toFixed(1)}</span><br>
+                    Avg Check: <span class="metric-value ${avgCheckA>250?'positive':avgCheckA>150?'':'negative'}">${avgCheckA.toFixed(1)}</span><br>
+                    Dep Count: <span class="metric-value">${Math.round(A.depCount)}</span><br>
+                    FD→2Dep: <span class="metric-value ${fd2A>=20?'positive':'negative'}">${fd2A.toFixed(1)}%</span><br>
+                    Dep Summ: <span class="metric-value">${Math.round(A.depSum)}</span><br>
+                    CNGR: <span class="metric-value ${A.cngr28>0?'positive':'negative'}">${Math.round(A.cngr28)}</span><br>
+                    Profit: <span class="metric-value ${profitA>0?'positive':'negative'}">${Math.round(profitA)}</span><br>
+                    OAS: <span class="metric-value ${oasA>=0.8?'positive':oasA>=0.5?'warning':'negative'}">${oasA.toFixed(2)}</span><br>
+                    Crash FTD: <span class="metric-value ${crashA<25?'positive':crashA<35?'warning':'negative'}">${crashA.toFixed(1)}%</span>
+                </div>
+            </div>
+            <div style="background:var(--bg-tertiary);padding:12px;border-radius:6px;">
+                <strong style="color:var(--accent);">${escapeHtml(b)}</strong>
+                <div style="margin-top:8px;font-size:12px;color:var(--text-muted);line-height:1.6">
+                    Cost: <span class="metric-value">${Math.round(B.cost)}</span><br>
+                    FTD: <span class="metric-value">${Math.round(B.ftd)}</span><br>
+                    CPA: <span class="metric-value ${cpaB<200?'positive':cpaB<300?'':'negative'}">${cpaB.toFixed(1)}</span><br>
+                    Avg Check: <span class="metric-value ${avgCheckB>250?'positive':avgCheckB>150?'':'negative'}">${avgCheckB.toFixed(1)}</span><br>
+                    Dep Count: <span class="metric-value">${Math.round(B.depCount)}</span><br>
+                    FD→2Dep: <span class="metric-value ${fd2B>=20?'positive':'negative'}">${fd2B.toFixed(1)}%</span><br>
+                    Dep Summ: <span class="metric-value">${Math.round(B.depSum)}</span><br>
+                    CNGR: <span class="metric-value ${B.cngr28>0?'positive':'negative'}">${Math.round(B.cngr28)}</span><br>
+                    Profit: <span class="metric-value ${profitB>0?'positive':'negative'}">${Math.round(profitB)}</span><br>
+                    OAS: <span class="metric-value ${oasB>=0.8?'positive':oasB>=0.5?'warning':'negative'}">${oasB.toFixed(2)}</span><br>
+                    Crash FTD: <span class="metric-value ${crashB<25?'positive':crashB<35?'warning':'negative'}">${crashB.toFixed(1)}%</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('compareResult').innerHTML = summary;
+}
+
+function escapeHtml(s){ 
+    if (s===null||s===undefined) return ''; 
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); 
+}
+
+function truncate(s,n){ 
+    return s.length>n ? s.slice(0,n-1)+'...' : s; 
+}
+
+function escapeJS(s){ 
+    return (s||'').replace(/'/g,"\\'").replace(/"/g,'\\"'); 
+}
+window.addEventListener('DOMContentLoaded', () => {
+  // Пытаемся автоматически загрузить data.csv
+  fetch('data.csv').then(response => {
+    if (!response.ok) throw new Error('No file');
+    return response.text();
+  }).then(csvText => {
+    // Парсим CSV через Papa Parse, как если бы пользователь загрузил файл
+    Papa.parse(csvText, {
+      header: true,
+      dynamicTyping: false,
+      skipEmptyLines: true,
+      complete: function(results) {
+        rawData = results.data.map(r => normalizeRow(r)).filter(r => r['Split 1'] && r['Split 2'] && r['Cohort Date']);
+        if (rawData.length === 0) {
+          alert('В файле data.csv нет строк с Split 1, Split 2 и Cohort Date');
+          document.getElementById('csvFile').style.display = 'block'; // показать поле загрузки
+          return;
+        }
+        initializeFilters();
+        processData();
+        document.getElementById('filters').style.display = 'flex';
+        document.getElementById('content').style.display = 'block';
+        document.getElementById('noData').style.display = 'none';
+      }
+    });
+  }).catch(err => {
+    // Если нет файла, показать input загрузки пользователю
+    document.getElementById('csvFile').style.display = 'block';
+  });
+});
+
 </script>
 </body>
 </html>
