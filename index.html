@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <style>
+    /* claude chrom https://claude.ai/chat/e819836f-4cad-4eaa-96ee-607b278141b4  */
 :root {
     --bg-primary: #0f1419;
     --bg-secondary: #1a1f2e;
@@ -293,6 +294,55 @@ tbody tr.highlight-row {
     background: rgba(0,0,0,0.2);
     border-radius: 4px;
     font-size: 12px;
+}
+.fd-contrib-table {
+    width: 100%;
+    margin-top: 12px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.fd-contrib-table thead {
+    background: var(--bg-tertiary);
+}
+
+.fd-contrib-table th {
+    padding: 10px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+}
+
+.fd-contrib-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.fd-contrib-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.toggle-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.toggle-btn:hover {
+    opacity: 0.85;
+}
+
+.small-cohort-list {
+    background: var(--bg-tertiary);
+    padding: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
 }
 </style>
 </head>
@@ -712,38 +762,119 @@ function displayMetrics(vals){
     const breakdown = `FD→2Dep (взвешенное по FTD): ${weighted}% — вычислено на основе данных по ${partners.length} партнёрам.`;
     document.getElementById('fd2Breakdown').textContent = breakdown;
 
-    // render contributors table with key values and expandable per-partner cohorts
-    if (!partners.length){
-        document.getElementById('fd2Contributors').innerHTML = '<div style="color:var(--text-muted)">Нет данных по FD→2Dep в отфильтрованных строках</div>';
-        return;
+    // Детализированная таблица с разбивкой по странам и оценкой влияния
+if (!partners.length){
+    document.getElementById('fd2Contributors').innerHTML = '<div style="color:var(--text-muted)">Нет данных по FD→2Dep в отфильтрованных строках</div>';
+    return;
+}
+
+const rows = partners.map(p => {
+    const id = makeId(p.partner);
+    const weightedStr = p.weighted.toFixed(1) + '%';
+    const simpleStr = p.simple.toFixed(1) + '%';
+    const ftdSum = Math.round(p.ftdSum);
+    const cohortsCount = p.cohortsCount;
+    
+    // Оценка: если взвешенное значение ниже общего - тянет вниз
+    const impactClass = p.weighted < weighted - 2 ? 'negative' : p.weighted > weighted + 2 ? 'positive' : '';
+    const impactText = p.weighted < weighted - 2 ? '⚠️ Тянет вниз' : p.weighted > weighted + 2 ? '✓ Выше среднего' : '~ Средний';
+    
+    // Детали когорт с разбивкой по странам
+    const cohortsByCountry = {};
+    p.topCohorts.forEach(c => {
+        if (!cohortsByCountry[c.country]) cohortsByCountry[c.country] = [];
+        cohortsByCountry[c.country].push(c);
+    });
+    
+    const countryDetails = Object.keys(cohortsByCountry).map(country => {
+    const cohorts = cohortsByCountry[country];
+    
+    // Считаем средний FD→2Dep и общие показатели
+    const avgFd2 = cohorts.reduce((sum, c) => sum + c.fdConv, 0) / cohorts.length;
+    const totalFtd = cohorts.reduce((sum, c) => sum + c.ftd, 0);
+    
+    // Вычисляем абсолютное количество вторых депозитов
+    // FD→2Dep это процент, поэтому: (FTD * FD→2Dep%) / 100 = количество вторых депозитов
+    const totalSecondDeposits = cohorts.reduce((sum, c) => sum + (c.ftd * c.fdConv / 100), 0);
+    
+    // Предупреждение о малой выборке
+    const isSmallSample = totalFtd < 10;
+    const sampleWarning = isSmallSample ? ' ⚠️ Малая выборка!' : '';
+    
+    // Цветовая индикация с учётом размера выборки
+    let fd2Class = '';
+    if (isSmallSample) {
+        fd2Class = 'warning'; // жёлтый для малых выборок
+    } else {
+        fd2Class = avgFd2 >= 20 ? 'positive' : avgFd2 >= 15 ? 'warning' : 'negative';
     }
-    const rows = partners.map(p=>{
-        const id = makeId(p.partner);
-        const weightedStr = p.weighted.toFixed(1) + '%';
-        const simpleStr = p.simple.toFixed(1) + '%';
-        const cohortsCount = p.cohortsCount;
-        const ftdSum = Math.round(p.ftdSum);
-        const cohortsPreview = p.topCohorts.map(c=>`${escapeHtml(c.date)} (${escapeHtml(c.country)}): ${c.fdConv.toFixed(1)}% | FTD ${Math.round(c.ftd)}`).join('; ');
-        return `<tr>
-            <td><strong>${escapeHtml(p.partner)}</strong></td>
-            <td>${weightedStr}</td>
-            <td>${simpleStr}</td>
-            <td>${ftdSum}</td>
-            <td>${cohortsCount}</td>
-            <td><button class="toggle-btn" onclick="togglePartnerDetails('${id}')">Показать детали</button></td>
-        </tr>
-        <tr id="details-${id}" style="display:none;">
-            <td colspan="6" class="small-cohort-list">
-                ${escapeHtml(cohortsPreview)}
-            </td>
-        </tr>`;
+        
+        return `
+    <div style="margin:6px 0;padding:8px;background:rgba(0,0,0,0.2);border-radius:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <strong>${escapeHtml(country)}</strong>: 
+                <span class="${fd2Class}">${avgFd2.toFixed(1)}%</span>${sampleWarning}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);">
+                ${Math.round(totalSecondDeposits)} из ${Math.round(totalFtd)} сделали 2-й депозит
+            </div>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">
+            Всего FTD: ${Math.round(totalFtd)} | Когорт: ${cohorts.length} | 2-е депозиты: ${Math.round(totalSecondDeposits)}
+        </div>
+        <div style="margin-top:6px;font-size:11px;opacity:0.7;border-top:1px solid var(--border);padding-top:6px;">
+            <strong>По датам когорт:</strong><br>
+            ${cohorts.map(c => {
+                const secondDeps = Math.round(c.ftd * c.fdConv / 100);
+                return `${c.date}: ${c.fdConv.toFixed(1)}% (${secondDeps} из ${Math.round(c.ftd)} FTD)`;
+            }).join('<br>')}
+        </div>
+    </div>
+`;
     }).join('');
+    
+    return `<tr>
+        <td><strong>${escapeHtml(p.partner)}</strong></td>
+        <td class="${impactClass}">${weightedStr}</td>
+        <td>${simpleStr}</td>
+        <td>${ftdSum.toLocaleString('en-US')}</td>
+        <td>${cohortsCount}</td>
+        <td class="${impactClass}">${impactText}</td>
+        <td><button class="toggle-btn" onclick="togglePartnerDetails('${id}')">Детали по странам</button></td>
+    </tr>
+    <tr id="details-${id}" style="display:none;">
+        <td colspan="7" class="small-cohort-list">
+            <strong>Разбивка по странам:</strong>
+            ${countryDetails}
+        </td>
+    </tr>`;
+}).join('');
+    
 
     const tableHtml = `<table class="fd-contrib-table">
-        <thead><tr><th>Партнёр</th><th>FD→2Dep (взв.)</th><th>FD→2Dep (прост.)</th><th>Суммарный FTD</th><th>Когорт(ы) в расчёте</th><th></th></tr></thead>
+    <thead><tr>
+        <th>Партнёр</th>
+        <th>FD→2Dep (взв.)</th>
+        <th>FD→2Dep (прост.)</th>
+        <th>Суммарный FTD</th>
+        <th>Когорт в расчёте</th>
+        <th>Оценка влияния</th>
+        <th></th>
+    </tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
-    document.getElementById('fd2Contributors').innerHTML = tableHtml;
+    document.getElementById('fd2Contributors').innerHTML = `
+    <div style="margin-top:16px;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border);">
+        <h3 style="color:var(--text-muted);font-size:14px;margin-bottom:8px;">
+            📊 Детализация FD→2Dep по партнёрам
+        </h3>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+            Показывает вклад каждого партнёра в общую конверсию. Партнёры с FD→2Dep ниже ${weighted}% тянут метрику вниз.
+        </div>
+        ${tableHtml}
+    </div>
+`;
 }
 
 // toggler для показа/скрытия детализации партнёра
@@ -1081,7 +1212,49 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('csvFile').style.display = 'block';
   });
 });
+// CPA (стоимость за привлечение):
 
+// < 200 → зелёный (positive)
+
+// 200–300 → нейтральный (без класса)
+
+// 300 → красный (negative)
+
+// FD→2Dep % (конверсия):
+
+// ≥ 20% → зелёный
+
+// < 20% → красный
+
+// Avg Check (средний чек):
+
+// 250 → зелёный
+
+// 150–250 → нейтральный
+
+// < 150 → красный
+
+// Profit 28D, CNGR 28D:
+
+// 0 → зелёный
+
+// ≤ 0 → красный
+
+// OAS 28D:
+
+// ≥ 0.8 → зелёный
+
+// 0.5–0.8 → жёлтый (warning)
+
+// < 0.5 → красный
+
+// Crash FTD % (процент сбоев):
+
+// < 25% → зелёный
+
+// 25–35% → жёлтый (warning)
+
+// 35% → красный
 </script>
 </body>
 </html>
