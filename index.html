@@ -390,6 +390,40 @@
             dateFrom: null,
             dateTo: null
         };
+        function loadDefaultCSV() {
+            const defaultURL = 'https://raw.githubusercontent.com/AnfisaAnalytics/dash_app/main/data.csv';
+            
+            fetch(defaultURL)
+                .then(response => {
+                    if (!response.ok) throw new Error('File not found');
+                    return response.text();
+                })
+                .then(csvText => {
+                    Papa.parse(csvText, {
+                        header: true,
+                        dynamicTyping: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            rawData = results.data.filter(row => 
+                                row['Split 1'] && row['Split 2']
+                            );
+                            
+                            if (rawData.length > 0) {
+                                initializeFilters();
+                                processData();
+                                document.getElementById('filters').style.display = 'flex';
+                                document.getElementById('content').style.display = 'block';
+                                document.getElementById('noData').style.display = 'none';
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.log('Автозагрузка не удалась, требуется ручная загрузка файла');
+                });
+        }
+
+        loadDefaultCSV();
 
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
