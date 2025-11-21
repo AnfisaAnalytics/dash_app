@@ -1183,9 +1183,12 @@ function escapeJS(s){
     return (s||'').replace(/'/g,"\\'").replace(/"/g,'\\"'); 
 }
 window.addEventListener('DOMContentLoaded', () => {
-  // Пытаемся автоматически загрузить data.csv
-  fetch('data.csv').then(response => {
-    if (!response.ok) throw new Error('No file');
+  // Автоматическая загрузка CSV из Google Drive
+  fetch('https://drive.google.com/uc?export=download&id=1_W9SUS6mEFdeIhJpSRifT7QxjccagrA1', {
+    method: 'GET',
+    mode: 'cors'  // Добавь это, если будут CORS-ошибки
+  }).then(response => {
+    if (!response.ok) throw new Error('Ошибка загрузки файла из Google Drive: ' + response.statusText);
     return response.text();
   }).then(csvText => {
     // Парсим CSV через Papa Parse, как если бы пользователь загрузил файл
@@ -1196,7 +1199,7 @@ window.addEventListener('DOMContentLoaded', () => {
       complete: function(results) {
         rawData = results.data.map(r => normalizeRow(r)).filter(r => r['Split 1'] && r['Split 2'] && r['Cohort Date']);
         if (rawData.length === 0) {
-          alert('В файле data.csv нет строк с Split 1, Split 2 и Cohort Date');
+          alert('В файле из Google Drive нет строк с Split 1, Split 2 и Cohort Date');
           document.getElementById('csvFile').style.display = 'block'; // показать поле загрузки
           return;
         }
@@ -1208,7 +1211,8 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     });
   }).catch(err => {
-    // Если нет файла, показать input загрузки пользователю
+    console.error('Ошибка автоматической загрузки:', err); // Для отладки
+    // Если нет файла или ошибка, показать input загрузки пользователю
     document.getElementById('csvFile').style.display = 'block';
   });
 });
