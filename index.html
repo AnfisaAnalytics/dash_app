@@ -56,10 +56,10 @@ body {
     padding: 20px 40px;
     border-radius: 12px;
 }
-.header>p{
+.filters>p{
     position: absolute;
-    bottom: 0;
-    left:3rem;
+    top: 12%;
+    left:1rem;
     color: rgba(255, 255, 255, 0.405);
     font-size: 0.7rem;
 }
@@ -822,8 +822,7 @@ tbody tr.highlight-row {
 <div class="container">
     <div class="header">
         <h1>Affiliate Marketing Analytics</h1>
-        <p>01.10.2025 – 23.11.2025
-Update: 23.11.2025 18:45</p>
+        
         <div class="file-upload">
             <label for="csvFile">Загрузить CSV</label>
             <input type="file" id="csvFile" accept=".csv">
@@ -831,6 +830,8 @@ Update: 23.11.2025 18:45</p>
     </div>
 
     <div id="filters" class="filters" style="display:none;">
+        <p>01.10.2025 – 23.11.2025<br>
+Update: 23.11.2025 18:45</p>
         <div class="filter-group">
             <label>Партнёр (Split 1)</label>
             <select id="partnerFilter" multiple size="4"></select>
