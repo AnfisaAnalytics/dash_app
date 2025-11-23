@@ -851,15 +851,25 @@ tbody tr.highlight-row {
         <div id="fd2Breakdown" style="margin-top:10px;color:var(--text-muted);font-size:13px;"></div>
 
         <div id="fd2Contributors" style="margin-top:6px;color:var(--text-muted);font-size:13px;"></div>
-
-        <div class="summary-panel">
+<div class="summary-panel">
             <div class="panel" id="problemCohorts">
-                <strong>Проблемные когорты (требуют внимания)</strong>
+                <strong>Когорты требуют внимания</strong>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;padding:8px;background:rgba(245,101,101,0.1);border-radius:4px;border-left:3px solid rgba(245,101,101,0.5);">
+                    • OAS 7D < 0.30<br>
+                    • FD→2Dep < 20%<br>
+                    • Profit 7D < -1000
+                </div>
                 <div id="problemList" style="margin-top:8px"></div>
             </div>
 
             <div class="panel" id="goodCohorts">
-                <strong>Успешные когорты (перформящие)</strong>
+                <strong>Перформящие когорты</strong>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;padding:8px;background:rgba(72,187,120,0.1);border-radius:4px;border-left:3px solid rgba(72,187,120,0.5);">
+                    • OAS 7D ≥ 0.40<br>
+                    • Profit 7D > 0<br>
+                    • FD→2Dep ≥ 20%<br>
+                    • CPA < 250
+                </div>
                 <div id="goodList" style="margin-top:8px"></div>
             </div>
 
@@ -892,8 +902,18 @@ tbody tr.highlight-row {
                 <div class="chart-wrapper"><canvas id="profitChart"></canvas></div>
             </div>
         </div>
-
-        <div class="table-container">
+        <!-- ВСТАВИТЬ СЮДА ЛЕГЕНДУ -->
+<div style="margin-bottom:12px;padding:12px;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border);">
+    <strong style="color:var(--text-muted);font-size:13px;">Пороговые значения метрик:</strong>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px;font-size:11px;">
+        <div><span style="color:#48bb78;">✓ OAS ≥ 0.40</span> | <span style="color:#ecc94b;">⚠ 0.30-0.39</span> | <span style="color:#f56565;">✗ < 0.30</span></div>
+        <div><span style="color:#48bb78;">✓ FD→2Dep ≥ 20%</span> | <span style="color:#f56565;">✗ < 20%</span></div>
+        <div><span style="color:#48bb78;">✓ CPA < 200</span> | <span style="color:#ecc94b;">⚠ 200-300</span> | <span style="color:#f56565;">✗ > 300</span></div>
+        <div><span style="color:#48bb78;">✓ Avg Check > 250</span> | <span style="color:#ecc94b;">⚠ 150-250</span> | <span style="color:#f56565;">✗ < 150</span></div>
+        <div><span style="color:#48bb78;">✓ Crash FTD < 25%</span> | <span style="color:#ecc94b;">⚠ 25-35%</span> | <span style="color:#f56565;">✗ > 35%</span></div>
+    </div>
+</div>
+<div class="table-container">
             <h3>Детальная статистика по источникам</h3>
             <div style="overflow:auto;max-height:500px;">
                 <table id="detailsTable">
@@ -1378,7 +1398,7 @@ function displayMetrics(vals){
                 Детализация FD→2Dep по партнёрам
             </h3>
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
-                Показывает вклад каждого партнёра в общую конверсию. Партнёры с FD→2Dep ниже ${weighted}% тянут метрику вниз.
+                Вклад каждого партнёра в общую конверсию. Партнёры с FD→2Dep ниже ${weighted}% тянут метрику вниз.
             </div>
             ${tableHtml}
         </div>
