@@ -908,7 +908,7 @@ Was updated: 24.11.2025 03:57(msk)</p>
 
         <div class="charts-grid">
             <div class="chart-container" style="width:100%;">
-                <h3>Cost vs CNGR 7D (по партнёру)</h3>
+                <h3>Cost vs CNGR  7D (по партнёру)</h3>
                 <div class="chart-wrapper"><canvas id="profitChart"></canvas></div>
             </div>
         </div>
@@ -967,7 +967,7 @@ Was updated: 24.11.2025 03:57(msk)</p>
 </div>
 
 <script>
-let rawData = [];
+    let rawData = [];
 let charts = {};
 let filters = { partner: [], country: [], dateFrom: null, dateTo: null, minFtd: 0 };
 
@@ -1178,19 +1178,42 @@ function processData(){
 
         const p = row['Split 1'];
         if (!partnerAgg[p]) partnerAgg[p] = {
-            fd2WeightedNum:0, fd2WeightedDen:0,
-            ftdSum:0, cohorts: []
+            fd2WeightedNum:0, 
+            fd2WeightedDen:0,
+            ftdSum:0, 
+            uniqueCohorts: new Set(),  // ← ИСПОЛЬЗУЕМ SET ДЛЯ УНИКАЛЬНОСТИ
+            cohortsByCountry: {}       // ← ГРУППИРОВКА ПО СТРАНАМ
         };
 
+        // Создаём уникальный ключ: дата + страна
+        const cohortKey = `${row['Cohort Date']}|${row['Split 2']}`;
+        
         if (ftd > 0 && fd2 > 0){
             partnerAgg[p].fd2WeightedNum += fd2 * ftd;
             partnerAgg[p].fd2WeightedDen += ftd;
-            partnerAgg[p].cohorts.push({
-                date: row['Cohort Date'] || '—',
-                fdConv: fd2,
-                ftd: ftd,
-                country: row['Split 2'] || ''
-            });
+            
+            // Добавляем в Set (автоматически убирает дубликаты)
+            partnerAgg[p].uniqueCohorts.add(cohortKey);
+            
+            // Группируем данные по странам для детализации
+            const country = row['Split 2'] || 'Unknown';
+            if (!partnerAgg[p].cohortsByCountry[country]) {
+                partnerAgg[p].cohortsByCountry[country] = {};
+            }
+            
+            const date = row['Cohort Date'] || '—';
+            if (!partnerAgg[p].cohortsByCountry[country][date]) {
+                partnerAgg[p].cohortsByCountry[country][date] = {
+                    ftd: 0,
+                    fd2WeightedNum: 0,
+                    fd2WeightedDen: 0
+                };
+            }
+            
+            // Аккумулируем данные для каждой даты
+            partnerAgg[p].cohortsByCountry[country][date].ftd += ftd;
+            partnerAgg[p].cohortsByCountry[country][date].fd2WeightedNum += fd2 * ftd;
+            partnerAgg[p].cohortsByCountry[country][date].fd2WeightedDen += ftd;
         }
         partnerAgg[p].ftdSum += ftd;
 
@@ -1255,16 +1278,20 @@ function processData(){
     const overallOas = totalCost > 0 ? Math.round(overall.dep7dS / totalCost * 100) / 100 : 0;
     const overallCrash = overall.crashWeightedDen > 0 ? Math.round(overall.crashWeightedNum / overall.crashWeightedDen * 10) / 10 : 0;
 
+    // НОВАЯ ЛОГИКА: считаем уникальные когорты правильно
     const fd2Partners = Object.keys(partnerAgg).map(p => {
         const pa = partnerAgg[p];
         const weighted = pa.fd2WeightedDen > 0 ? Math.round(pa.fd2WeightedNum / pa.fd2WeightedDen * 10) / 10 : 0;
-        const topCohorts = pa.cohorts.slice().sort((a,b)=>b.ftd - a.ftd).slice(0,5);
+        
+        // Используем размер Set для получения количества уникальных когорт
+        const uniqueCohortsCount = pa.uniqueCohorts.size;
+        
         return {
             partner: p,
             weighted: weighted,
             ftdSum: pa.ftdSum,
-            cohortsCount: pa.cohorts.length,
-            topCohorts
+            cohortsCount: uniqueCohortsCount,  // ← КОРРЕКТНОЕ КОЛИЧЕСТВО
+            cohortsByCountry: pa.cohortsByCountry
         };
     }).filter(x => x.cohortsCount > 0).sort((a,b)=>b.ftdSum - a.ftdSum);
 
@@ -1329,19 +1356,27 @@ function displayMetrics(vals){
         const impactClass = p.weighted < weighted - 2 ? 'negative' : p.weighted > weighted + 2 ? 'positive' : '';
         const impactText = p.weighted < weighted - 2 ? '⚠️ Тянет вниз' : p.weighted > weighted + 2 ? '✓ Выше среднего' : '~ Средний';
 
-        const cohortsByCountry = {};
-        p.topCohorts.forEach(c => {
-            if (!cohortsByCountry[c.country]) cohortsByCountry[c.country] = [];
-            cohortsByCountry[c.country].push(c);
-        });
-
-        const countryDetails = Object.keys(cohortsByCountry).map(country => {
-            const cohorts = cohortsByCountry[country];
-            const avgFd2 = cohorts.reduce((sum, c) => sum + c.fdConv, 0) / cohorts.length;
-            const totalFtd = cohorts.reduce((sum, c) => sum + c.ftd, 0);
-            const totalSecondDeposits = cohorts.reduce((sum, c) => sum + (c.ftd * c.fdConv / 100), 0);
+        // НОВАЯ ЛОГИКА: используем предварительно сгруппированные данные
+        const countryDetails = Object.keys(p.cohortsByCountry).map(country => {
+            const dates = p.cohortsByCountry[country];
+            const dateKeys = Object.keys(dates).sort();
+            
+            // Считаем общие показатели по стране
+            let totalFtd = 0;
+            let totalFd2WeightedNum = 0;
+            let totalFd2WeightedDen = 0;
+            
+            dateKeys.forEach(date => {
+                totalFtd += dates[date].ftd;
+                totalFd2WeightedNum += dates[date].fd2WeightedNum;
+                totalFd2WeightedDen += dates[date].fd2WeightedDen;
+            });
+            
+            const avgFd2 = totalFd2WeightedDen > 0 ? totalFd2WeightedNum / totalFd2WeightedDen : 0;
+            const totalSecondDeposits = Math.round(totalFd2WeightedNum / 100);
             const isSmallSample = totalFtd < 10;
             const sampleWarning = isSmallSample ? ' ⚠️ Малая выборка!' : '';
+            const cohortsInCountry = dateKeys.length;
 
             let fd2Class = '';
             if (isSmallSample) {
@@ -1358,17 +1393,19 @@ function displayMetrics(vals){
                     <span class="${fd2Class}">${avgFd2.toFixed(1)}%</span>${sampleWarning}
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);">
-                    ${Math.round(totalSecondDeposits)} из ${Math.round(totalFtd)} сделали 2-й депозит
+                    ${totalSecondDeposits} из ${Math.round(totalFtd)} сделали 2-й депозит
                 </div>
             </div>
             <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">
-                Всего FTD: ${Math.round(totalFtd)} | Когорт: ${cohorts.length} | 2-е депозиты: ${Math.round(totalSecondDeposits)}
+                Всего FTD: ${Math.round(totalFtd)} | Когорт (уникальных дат): ${cohortsInCountry} | 2-е депозиты: ${totalSecondDeposits}
             </div>
             <div style="margin-top:6px;font-size:11px;opacity:0.7;border-top:1px solid var(--border);padding-top:6px;">
                 <strong>По датам когорт:</strong><br>
-                ${cohorts.map(c => {
-                    const secondDeps = Math.round(c.ftd * c.fdConv / 100);
-                    return `${c.date}: ${c.fdConv.toFixed(1)}% (${secondDeps} из ${Math.round(c.ftd)} FTD)`;
+                ${dateKeys.map(date => {
+                    const dateData = dates[date];
+                    const dateFd2 = dateData.fd2WeightedDen > 0 ? dateData.fd2WeightedNum / dateData.fd2WeightedDen : 0;
+                    const secondDeps = Math.round(dateData.fd2WeightedNum / 100);
+                    return `${date}: ${dateFd2.toFixed(1)}% (${secondDeps} из ${Math.round(dateData.ftd)} FTD)`;
                 }).join('<br>')}
             </div>
         </div>
@@ -1385,7 +1422,7 @@ function displayMetrics(vals){
         </tr>
         <tr id="details-${id}" style="display:none;">
             <td colspan="6" class="small-cohort-list">
-                <strong>Разбивка по странам:</strong>
+                <strong>Разбивка по странам (уникальные когорты = дата + страна):</strong>
                 ${countryDetails}
             </td>
         </tr>`;
@@ -1396,7 +1433,7 @@ function displayMetrics(vals){
             <th>Партнёр</th>
             <th>FD→2Dep (взв.)</th>
             <th>Суммарный FTD</th>
-            <th>Когорт в расчёте</th>
+            <th>Когорт (уник. дата+страна)</th>
             <th>Оценка влияния</th>
             <th></th>
         </tr></thead>
@@ -1407,6 +1444,11 @@ function displayMetrics(vals){
             <h3 style="color:var(--text-muted);font-size:14px;margin-bottom:8px;">
                 Детализация FD→2Dep по партнёрам
             </h3>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+                <strong>Что такое "когорта"?</strong> Уникальная комбинация (Дата + Страна).<br>
+                Например: SAIDIteam | Czech Republic | 2025-11-11 = 1 когорта<br>
+                <em>Несколько строк CSV с одинаковой датой и страной считаются как 1 когорта.</em>
+            </div>
             <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
                 Вклад каждого партнёра в общую конверсию. Партнёры с FD→2Dep ниже ${weighted}% тянут метрику вниз.
             </div>
