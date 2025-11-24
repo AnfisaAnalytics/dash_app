@@ -1175,47 +1175,44 @@ function processData(){
             aggregated[key].crashWeightedNum += crash * ftd;
             aggregated[key].crashWeightedDen += ftd;
         }
-
         const p = row['Split 1'];
         if (!partnerAgg[p]) partnerAgg[p] = {
             fd2WeightedNum:0, 
             fd2WeightedDen:0,
-            ftdSum:0, 
-            uniqueCohorts: new Set(),  // ← ИСПОЛЬЗУЕМ SET ДЛЯ УНИКАЛЬНОСТИ
-            cohortsByCountry: {}       // ← ГРУППИРОВКА ПО СТРАНАМ
+            uniqueCohorts: new Set(),
+            cohortsByCountry: {}
         };
 
         // Создаём уникальный ключ: дата + страна
         const cohortKey = `${row['Cohort Date']}|${row['Split 2']}`;
         
+        // Добавляем когорту в Set (автоматически убирает дубликаты)
+        partnerAgg[p].uniqueCohorts.add(cohortKey);
+        
+        // Группируем данные по странам для детализации
+        const country = row['Split 2'] || 'Unknown';
+        if (!partnerAgg[p].cohortsByCountry[country]) {
+            partnerAgg[p].cohortsByCountry[country] = {};
+        }
+        
+        const date = row['Cohort Date'] || '—';
+        if (!partnerAgg[p].cohortsByCountry[country][date]) {
+            partnerAgg[p].cohortsByCountry[country][date] = {
+                ftd: 0,
+                fd2WeightedNum: 0,
+                fd2WeightedDen: 0
+            };
+        }
+        
+        // Аккумулируем данные для каждой даты (ОДИН РАЗ)
+        partnerAgg[p].cohortsByCountry[country][date].ftd += ftd;
+        
         if (ftd > 0 && fd2 > 0){
             partnerAgg[p].fd2WeightedNum += fd2 * ftd;
             partnerAgg[p].fd2WeightedDen += ftd;
-            
-            // Добавляем в Set (автоматически убирает дубликаты)
-            partnerAgg[p].uniqueCohorts.add(cohortKey);
-            
-            // Группируем данные по странам для детализации
-            const country = row['Split 2'] || 'Unknown';
-            if (!partnerAgg[p].cohortsByCountry[country]) {
-                partnerAgg[p].cohortsByCountry[country] = {};
-            }
-            
-            const date = row['Cohort Date'] || '—';
-            if (!partnerAgg[p].cohortsByCountry[country][date]) {
-                partnerAgg[p].cohortsByCountry[country][date] = {
-                    ftd: 0,
-                    fd2WeightedNum: 0,
-                    fd2WeightedDen: 0
-                };
-            }
-            
-            // Аккумулируем данные для каждой даты
-            partnerAgg[p].cohortsByCountry[country][date].ftd += ftd;
             partnerAgg[p].cohortsByCountry[country][date].fd2WeightedNum += fd2 * ftd;
             partnerAgg[p].cohortsByCountry[country][date].fd2WeightedDen += ftd;
         }
-        partnerAgg[p].ftdSum += ftd;
 
         overall.cost += cost;
         overall.ftd += ftd;
@@ -1278,7 +1275,7 @@ function processData(){
     const overallOas = totalCost > 0 ? Math.round(overall.dep7dS / totalCost * 100) / 100 : 0;
     const overallCrash = overall.crashWeightedDen > 0 ? Math.round(overall.crashWeightedNum / overall.crashWeightedDen * 10) / 10 : 0;
 
-    // НОВАЯ ЛОГИКА: считаем уникальные когорты правильно
+    // НОВАЯ ЛОГИКА: считаем FTD из детализации (без дублей)
     const fd2Partners = Object.keys(partnerAgg).map(p => {
         const pa = partnerAgg[p];
         const weighted = pa.fd2WeightedDen > 0 ? Math.round(pa.fd2WeightedNum / pa.fd2WeightedDen * 10) / 10 : 0;
@@ -1286,11 +1283,19 @@ function processData(){
         // Используем размер Set для получения количества уникальных когорт
         const uniqueCohortsCount = pa.uniqueCohorts.size;
         
+        // Считаем РЕАЛЬНЫЙ FTD из детализации
+        let totalFtd = 0;
+        Object.values(pa.cohortsByCountry).forEach(countryData => {
+            Object.values(countryData).forEach(dateData => {
+                totalFtd += dateData.ftd;
+            });
+        });
+        
         return {
             partner: p,
             weighted: weighted,
-            ftdSum: pa.ftdSum,
-            cohortsCount: uniqueCohortsCount,  // ← КОРРЕКТНОЕ КОЛИЧЕСТВО
+            ftdSum: totalFtd,  // ← КОРРЕКТНОЕ ЗНАЧЕНИЕ БЕЗ ДУБЛЕЙ
+            cohortsCount: uniqueCohortsCount,
             cohortsByCountry: pa.cohortsByCountry
         };
     }).filter(x => x.cohortsCount > 0).sort((a,b)=>b.ftdSum - a.ftdSum);
