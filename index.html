@@ -1312,7 +1312,7 @@ function displayMetrics(vals){
 
     const weighted = vals.overallFd2Weighted.toFixed(1);
     const partners = vals.fd2Partners || [];
-    const breakdown = `FD→2Dep (взвешенное по FTD): ${weighted}% — вычислено на основе данных по ${partners.length} партнёрам.`;
+    const breakdown = `FD→2Dep (взвешенное по FTD): ${weighted}% — вычислено на основе данных по ${partners.length} партнёрам (учитываются только партнёры с ненулевыми значениями FTD и FD→2Dep в данных).`;
     document.getElementById('fd2Breakdown').textContent = breakdown;
 
     if (!partners.length){
