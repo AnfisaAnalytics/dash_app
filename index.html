@@ -831,7 +831,7 @@ tbody tr.highlight-row {
 
     <div id="filters" class="filters" style="display:none;">
         <p>01.10.2025 – 23.11.2025<br>
-Was updated: 24.11.2025 13:31(msk)</p>
+Was updated: 24.11.2025 03:57(msk)</p>
         <div class="filter-group">
             <label>Партнёр (Split 1)</label>
             <select id="partnerFilter" multiple size="4"></select>
@@ -949,7 +949,7 @@ Was updated: 24.11.2025 13:31(msk)</p>
                     <tbody id="detailsTableBody"></tbody>
                 </table>
             </div>
-            <div id="rowDetails" class="details-expanded" style="display:none"></div>
+            <!-- <div id="rowDetails" class="details-expanded" style="display:none"></div> -->
         </div>
     </div>
 
@@ -1570,7 +1570,7 @@ function displayTable(data){
         const crashClass = d.crashFtd < 25 ? 'positive' : d.crashFtd < 35 ? 'warning' : 'negative';
         const statusClass = d.isGood ? 'status-good' : 'status-bad';
 
-        return `<tr data-key="${escapeHtml(d.partner)}|${escapeHtml(d.country)}" onclick="showRowDetails(event)">
+        return `<tr data-key="${escapeHtml(d.partner)}|${escapeHtml(d.country)}">
             <td><strong>${escapeHtml(d.partner)}</strong></td>
             <td>${escapeHtml(d.country)}</td>
             <td>${escapeHtml(d.rows.map(r=>r['Cohort Date']).filter(Boolean).slice(0,1)[0] || '')}</td>
@@ -1590,86 +1590,8 @@ function displayTable(data){
     }).join('');
 }
 
-function showRowDetails(e){
-    const tr = e.currentTarget;
-    const key = tr.getAttribute('data-key');
-    const [partner,country] = key.split('|');
-    const filtered = getFilteredData();
-    const rows = filtered.filter(r => r['Split 1']===partner && r['Split 2']===country);
-    if (rows.length === 0) return;
 
-    const dist = {};
-    rows.forEach(r => {
-        const d = r['Cohort Date'] || '—';
-        if (!dist[d]) dist[d] = {ftd:0, fd2:[], cost:0, crash:[], rawRows:[]};
-        const ftd = parseNumber(r['First Deposit C']);
-        const fd2 = parseNumber(r['24h First Deposit 2 Deposit Conversion']);
-        const crash = parseNumber(r['Mono Instant Depositor Share']);
 
-        dist[d].ftd += ftd;
-        dist[d].cost += parseNumber(r['Marketing Spend']);
-
-        if (ftd > 0 && fd2 > 0) {
-            dist[d].fd2.push({fd2: fd2, ftd: ftd});
-        }
-
-        if (ftd > 0 && crash > 0) {
-            dist[d].crash.push({crash: crash, ftd: ftd});
-        }
-
-        dist[d].rawRows.push(r);
-    });
-
-    const rowsHtml = Object.keys(dist).sort().map(date=>{
-        const entry = dist[date];
-
-        let avgFd2 = 0;
-        if (entry.fd2.length > 0) {
-            const weightedSum = entry.fd2.reduce((sum, item) => sum + (item.fd2 * item.ftd), 0);
-            const totalFtd = entry.fd2.reduce((sum, item) => sum + item.ftd, 0);
-            avgFd2 = totalFtd > 0 ? weightedSum / totalFtd : 0;
-        }
-
-        let avgCrash = 0;
-        if (entry.crash.length > 0) {
-            const weightedSum = entry.crash.reduce((sum, item) => sum + (item.crash * item.ftd), 0);
-            const totalFtd = entry.crash.reduce((sum, item) => sum + item.ftd, 0);
-            avgCrash = totalFtd > 0 ? weightedSum / totalFtd : 0;
-        }
-
-        const fdClass = avgFd2 >= 20 ? 'positive' : 'negative';
-        const crashClass = avgCrash < 25 ? 'positive' : avgCrash < 35 ? 'warning' : 'negative';
-
-        return `<tr>
-            <td>${escapeHtml(date)}</td>
-            <td>${Math.round(entry.ftd)}</td>
-            <td>${Math.round(entry.cost)}</td>
-            <td class="${fdClass}">${avgFd2.toFixed(1)}%</td>
-            <td class="${crashClass}">${avgCrash.toFixed(1)}%</td>
-        </tr>`;
-    }).join('');
-
-    const container = document.getElementById('rowDetails');
-    container.style.display = 'block';
-    container.innerHTML = `<strong>Детали: ${escapeHtml(partner)} — ${escapeHtml(country)}</strong>
-        <div style="margin-top:8px;font-size:13px;color:var(--muted)">Разбивка по датам когорт</div>
-        <table style="width:100%;margin-top:8px;color:var(--muted)">
-            <thead><tr><th>Когорта</th><th>FTD</th><th>Cost</th><th>FD→2Dep %</th><th>Crash FTD %</th></tr></thead>
-            <tbody>${rowsHtml}</tbody>
-        </table>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-            <button class="btn" onclick="closeRowDetails()">Закрыть</button>
-        </div>
-    `;
-
-    Array.from(document.querySelectorAll('#detailsTableBody tr')).forEach(r=>r.classList.remove('highlight-row'));
-    tr.classList.add('highlight-row');
-}
-
-function closeRowDetails(){
-    document.getElementById('rowDetails').style.display = 'none';
-    Array.from(document.querySelectorAll('#detailsTableBody tr')).forEach(r=>r.classList.remove('highlight-row'));
-}
 
 function displayProblemLists(processed){
     const problems = processed.filter(p => p.isProblem).sort((a,b)=>a.oas7d - b.oas7d).slice(0,10);
