@@ -831,7 +831,7 @@ tbody tr.highlight-row {
 
     <div id="filters" class="filters" style="display:none;">
         <p>01.10.2025 – 26.11.2025<br>
-Was updated: 26.11.2025 04:08 (msk)</p>
+Was updated: 27.11.2025 04:40 (msk)</p>
         <div class="filter-group">
             <label>Партнёр (Split 1)</label>
             <select id="partnerFilter" multiple size="4"></select>
@@ -1747,7 +1747,7 @@ function truncate(s,n){
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    fetch('data.csv').then(response => {
+    fetch('dash.csv').then(response => {
         if (!response.ok) throw new Error('No file');
         return response.text();
     }).then(csvText => {
