@@ -1756,7 +1756,7 @@ function truncate(s,n){
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    fetch('dash.csv').then(response => {
+    fetch('dash1.csv').then(response => {
         if (!response.ok) throw new Error('No file');
         return response.text();
     }).then(csvText => {
